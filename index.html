@@ -2,37 +2,28 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft Survival Update</title>
+    <title>Minecraft Survival Fixed</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: monospace; user-select: none; }
         
-        #blocker { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: center; justify-content: center; }
-        #instructions { color: white; font-size: 30px; text-align: center; cursor: pointer; background: rgba(0,0,0,0.7); padding: 40px; border: 2px solid white; }
+        /* UI LAYERS */
+        #blocker { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; display: flex; align-items: center; justify-content: center; }
+        #instructions { color: white; font-size: 30px; text-align: center; cursor: pointer; background: rgba(0,0,0,0.8); padding: 40px; border: 2px solid white; }
         
-        /* SETTINGS & CRAFTING */
-        .menu-window {
-            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 400px; background: #333; color: white; border: 2px solid white; padding: 20px; z-index: 200;
-        }
-        .recipe-btn { padding: 10px; border: 1px solid #555; margin: 5px; cursor: pointer; background: #222; }
-        .recipe-btn:hover { background: #444; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.8); transform: translate(-50%, -50%); z-index: 10; border-radius: 50%; }
         
-        /* HUD */
-        #info { position: absolute; top: 10px; left: 10px; color: white; font-weight: bold; text-shadow: 2px 2px 0 #000; z-index: 5; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.8); transform: translate(-50%, -50%); z-index: 5; border-radius: 50%; }
-        #hotbar-container { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 5px; z-index: 5; }
+        /* HOTBAR */
+        #hotbar-container { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 5px; z-index: 10; }
         #hotbar { display: flex; gap: 4px; background: rgba(0,0,0,0.5); padding: 4px; }
-        
-        .slot { 
-            width: 50px; height: 50px; border: 2px solid #555; background: rgba(0,0,0,0.5); 
-            color: white; display: flex; align-items: center; justify-content: center; font-size: 24px; position: relative;
-        }
+        .slot { width: 50px; height: 50px; border: 2px solid #555; background: rgba(0,0,0,0.5); color: white; display: flex; align-items: center; justify-content: center; font-size: 24px; position: relative; }
         .slot::after { content: attr(data-count); position: absolute; bottom: 2px; right: 2px; font-size: 12px; }
         .selected { border-color: white; background: rgba(255,255,255,0.2); transform: scale(1.1); }
-
-        #minimap-container { position: absolute; top: 10px; right: 10px; width: 150px; height: 150px; border: 3px solid white; background: #000; z-index: 50; }
-        #minimap-canvas { width: 100%; height: 100%; }
+        
+        /* MENUS */
+        .menu-window { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; background: #333; color: white; border: 2px solid white; padding: 20px; z-index: 1000; }
     </style>
+    
+    <!-- LIBRARIES -->
     <script type="importmap">
         { "imports": {
             "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
@@ -40,32 +31,26 @@
             "simplex-noise": "https://unpkg.com/simplex-noise@4.0.1/dist/esm/simplex-noise.js"
         }}
     </script>
-    <script src="/socket.io/socket.io.js"></script>
+    
+    <!-- FIX: Use Public CDN for Multiplayer so it doesn't crash on Static Sites -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 <body>
     <div id="blocker">
-        <div id="instructions">CLICK TO PLAY<br><span style="font-size:16px">P = Settings | E = Crafting</span></div>
+        <div id="instructions">
+            <h1>CLICK TO START</h1>
+            <p>WASD to Move | SPACE to Jump</p>
+            <p>Left Click: Mine | Right Click: Place</p>
+            <p>E: Crafting | P: Settings</p>
+        </div>
     </div>
 
-    <!-- SETTINGS -->
-    <div id="settings-menu" class="menu-window">
-        <h2>SETTINGS</h2>
-        <div>Render Distance: <input id="render-dist" type="range" min="2" max="10" value="3"></div>
-        <div>Sensitivity: <input id="sensitivity" type="range" min="1" max="100" value="50"></div>
-        <div style="margin-top:20px; text-align:center"><button id="close-settings">Back</button></div>
-    </div>
+    <!-- MENUS -->
+    <div id="crafting-menu" class="menu-window"><h2>Crafting</h2><div id="crafting-list"></div></div>
+    <div id="settings-menu" class="menu-window"><h2>Settings</h2><button id="close-settings">Close</button></div>
 
-    <!-- CRAFTING -->
-    <div id="crafting-menu" class="menu-window">
-        <h2>CRAFTING</h2>
-        <div id="crafting-list"></div>
-        <div style="margin-top:20px; text-align:center"><button onclick="document.getElementById('crafting-menu').style.display='none'">Close</button></div>
-    </div>
-
-    <div id="info"><div id="coords">Init...</div></div>
-    <div id="minimap-container"><canvas id="minimap-canvas" width="150" height="150"></canvas></div>
+    <!-- HUD -->
     <div id="crosshair"></div>
-
     <div id="hotbar-container">
         <div id="hotbar">
             <!-- 9 Slots -->
@@ -75,6 +60,7 @@
         </div>
     </div>
 
+    <!-- GAME LOGIC -->
     <script type="module" src="./src/game.js"></script>
 </body>
 </html>

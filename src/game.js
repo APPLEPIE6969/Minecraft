@@ -2,11 +2,12 @@ import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { updateWorld, isSolid, getSurfaceHeight } from './world.js';
 import { MobController } from './mobs.js';
+import { Minimap } from './minimap.js';
 
-// --- SETUP ---
+// Setup
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
-scene.fog = new THREE.Fog(0x87CEEB, 20, 60);
+scene.fog = new THREE.Fog(0x87CEEB, 20, 80);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: false });
@@ -14,32 +15,28 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-// Lights
 scene.add(new THREE.AmbientLight(0xffffff, 0.7));
 const sun = new THREE.DirectionalLight(0xffffff, 0.8);
 sun.position.set(50, 100, 50);
 sun.castShadow = true;
 scene.add(sun);
 
-// --- START SCREEN LOGIC ---
+// UI & Controls
 const controls = new PointerLockControls(camera, document.body);
 const blocker = document.getElementById('blocker');
-const instructions = document.getElementById('instructions');
-
-if(instructions) {
-    instructions.addEventListener('click', () => controls.lock());
+if(document.getElementById('instructions')) {
+    document.getElementById('instructions').addEventListener('click', () => controls.lock());
 }
 controls.addEventListener('lock', () => { if(blocker) blocker.style.display = 'none'; });
 controls.addEventListener('unlock', () => { if(blocker) blocker.style.display = 'flex'; });
 
-// --- PLAYER ---
-const startX = 0; 
+// Player Setup
+const startX = 0;
 const startZ = 0;
-let groundH = 20;
-try { groundH = getSurfaceHeight(startX, startZ); } catch(e) {}
-
+// Force Ground Height Check
+const groundH = getSurfaceHeight(startX, startZ);
 const player = { 
-    pos: new THREE.Vector3(startX, groundH + 5, startZ), 
+    pos: new THREE.Vector3(startX, groundH + 10, startZ), 
     vel: new THREE.Vector3(), 
     w: 0.6, h: 1.8 
 };
@@ -48,9 +45,11 @@ const player = {
 updateWorld(scene, player.pos);
 camera.position.copy(player.pos);
 
-// Mobs (Safe Mode)
+// Modules
 let mobManager;
-try { mobManager = new MobController(scene); } catch(e) { console.log("No mobs found"); }
+try { mobManager = new MobController(scene); } catch(e) {}
+let minimap;
+setTimeout(() => { minimap = new Minimap(scene, player); }, 1000); // Delay to let DOM load
 
 // Input
 const keys = { w:0, a:0, s:0, d:0, sp:0, sh:0 };
@@ -71,7 +70,7 @@ document.addEventListener('keyup', e => {
     if(e.code==='ShiftLeft') keys.sh=0;
 });
 
-// --- PHYSICS ---
+// ROBUST PHYSICS (Wall Checks)
 function checkCol(x, y, z) {
     const minX = Math.floor(x - player.w/2), maxX = Math.floor(x + player.w/2);
     const minZ = Math.floor(z - player.w/2), maxZ = Math.floor(z + player.w/2);
@@ -87,7 +86,6 @@ function checkCol(x, y, z) {
     return false;
 }
 
-// --- LOOP ---
 const clock = new THREE.Clock();
 const elCoords = document.getElementById('coords');
 
@@ -96,7 +94,7 @@ function animate() {
     const delta = Math.min(clock.getDelta(), 0.1);
 
     if (controls.isLocked) {
-        const speed = keys.sh ? 8.0 : 4.3;
+        const speed = keys.sh ? 10.0 : 5.0;
         const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
         fwd.y=0; fwd.normalize();
         const rgt = new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
@@ -107,36 +105,47 @@ function animate() {
         if(keys.s) move.sub(fwd);
         if(keys.d) move.add(rgt);
         if(keys.a) move.sub(rgt);
-        
         if(move.length()>0) move.normalize().multiplyScalar(speed*delta);
 
+        // Movement
         if(!checkCol(player.pos.x+move.x, player.pos.y, player.pos.z)) player.pos.x += move.x;
         if(!checkCol(player.pos.x, player.pos.y, player.pos.z+move.z)) player.pos.z += move.z;
 
-        player.vel.y -= 25 * delta;
+        // Gravity / Floor Clamping (Fixes Falling Through)
+        player.vel.y -= 30 * delta;
         const nextY = player.pos.y + player.vel.y * delta;
-
-        if(!checkCol(player.pos.x, nextY, player.pos.z)) {
+        
+        // Check where the floor is exactly
+        const floorHeight = getSurfaceHeight(player.pos.x, player.pos.z);
+        
+        // If we are about to fall below floor, SNAP to floor
+        if (nextY < floorHeight + 1.8 && player.pos.y >= floorHeight) {
+            player.pos.y = floorHeight + 1.8; // Stand on block
+            player.vel.y = 0;
+            if (keys.sp) player.vel.y = 10; // Jump
+        } 
+        // If we are high in the air, falling is fine
+        else if (!checkCol(player.pos.x, nextY, player.pos.z)) {
             player.pos.y = nextY;
         } else {
-            if(player.vel.y < 0) { 
-                player.vel.y = 0;
-                player.pos.y = Math.ceil(player.pos.y - 1);
-                if(keys.sp) player.vel.y = 9;
-            } else {
-                player.vel.y = 0;
-            }
+             player.vel.y = 0; // Hit head or other solid
+        }
+        
+        // Void Reset
+        if(player.pos.y < -100) { 
+             player.pos.y = floorHeight + 10; 
+             player.vel.y = 0; 
         }
 
-        if(player.pos.y < -100) { player.pos.y = 100; player.vel.y = 0; }
-
         camera.position.copy(player.pos);
-        camera.position.y += 1.6;
+        camera.position.y += 0.0; // Already calculated eyes
 
         if(elCoords) elCoords.innerText = `X: ${Math.floor(player.pos.x)} Y: ${Math.floor(player.pos.y)} Z: ${Math.floor(player.pos.z)}`;
     }
 
     if(mobManager) mobManager.update(delta, player.pos);
+    if(minimap) minimap.update();
+    
     updateWorld(scene, player.pos);
     renderer.render(scene, camera);
 }

@@ -2,111 +2,101 @@ import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { updateChunks, getHeight } from './world.js';
 
-// --- SETUP ---
+// Setup
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
-scene.fog = new THREE.Fog(0x87CEEB, 20, 60); // Distance fog
+scene.fog = new THREE.Fog(0x87CEEB, 20, 70);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ antialias: false }); // False is better for pixel art style
+const renderer = new THREE.WebGLRenderer({ antialias: false });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// --- LIGHTS ---
-const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+// Lighting
+const ambient = new THREE.AmbientLight(0xffffff, 0.7);
 scene.add(ambient);
 const sun = new THREE.DirectionalLight(0xffffff, 0.8);
 sun.position.set(50, 100, 50);
 scene.add(sun);
 
-// --- CONTROLS ---
+// Controls
 const controls = new PointerLockControls(camera, document.body);
 document.body.addEventListener('click', () => controls.lock());
 
+// Input
 const keys = { w:false, a:false, s:false, d:false, space:false };
 document.addEventListener('keydown', (e) => {
-    switch(e.code) {
-        case 'KeyW': keys.w = true; break;
-        case 'KeyA': keys.a = true; break;
-        case 'KeyS': keys.s = true; break;
-        case 'KeyD': keys.d = true; break;
-        case 'Space': keys.space = true; break;
-    }
+    if(e.code === 'KeyW') keys.w = true;
+    if(e.code === 'KeyA') keys.a = true;
+    if(e.code === 'KeyS') keys.s = true;
+    if(e.code === 'KeyD') keys.d = true;
+    if(e.code === 'Space') keys.space = true;
 });
 document.addEventListener('keyup', (e) => {
-    switch(e.code) {
-        case 'KeyW': keys.w = false; break;
-        case 'KeyA': keys.a = false; break;
-        case 'KeyS': keys.s = false; break;
-        case 'KeyD': keys.d = false; break;
-        case 'Space': keys.space = false; break;
-    }
+    if(e.code === 'KeyW') keys.w = false;
+    if(e.code === 'KeyA') keys.a = false;
+    if(e.code === 'KeyS') keys.s = false;
+    if(e.code === 'KeyD') keys.d = false;
+    if(e.code === 'Space') keys.space = false;
 });
 
-// --- PHYSICS VARIABLES ---
-const playerVelocity = new THREE.Vector3();
-const playerDirection = new THREE.Vector3();
+// Physics
+const velocity = new THREE.Vector3();
+const direction = new THREE.Vector3();
 let canJump = false;
-const gravity = 30.0; // Gravity strength
-const speed = 10.0;   // Walk speed
+const gravity = 25.0;
 
-// Set Initial Spawn (Find a safe height)
-const startHeight = getHeight(0, 0);
-camera.position.set(0, startHeight + 2, 0);
-document.getElementById('loading').style.display = 'none';
+// Force generate the chunk UNDER the player immediately so you don't fall
+// The rest will load in background
+updateChunks(scene, new THREE.Vector3(0,0,0)); 
 
-// --- ANIMATION LOOP ---
+// Set Spawn Point
+const startY = getHeight(0, 0);
+camera.position.set(0, startY + 5, 0);
+
 const clock = new THREE.Clock();
 
 function animate() {
     requestAnimationFrame(animate);
-
     const delta = clock.getDelta();
 
-    // 1. Generate Infinite Terrain
-    updateChunks(scene, camera.position);
-
+    // 1. Physics (Always runs, even if chunk isn't visible yet)
     if (controls.isLocked) {
-        // 2. Physics & Gravity
-        playerVelocity.x -= playerVelocity.x * 10.0 * delta;
-        playerVelocity.z -= playerVelocity.z * 10.0 * delta;
-        playerVelocity.y -= gravity * delta; // Apply gravity
+        velocity.x -= velocity.x * 10.0 * delta;
+        velocity.z -= velocity.z * 10.0 * delta;
+        velocity.y -= gravity * delta;
 
-        playerDirection.z = Number(keys.w) - Number(keys.s);
-        playerDirection.x = Number(keys.d) - Number(keys.a);
-        playerDirection.normalize();
+        direction.z = Number(keys.w) - Number(keys.s);
+        direction.x = Number(keys.d) - Number(keys.a);
+        direction.normalize();
 
-        if (keys.w || keys.s) playerVelocity.z -= playerDirection.z * 400.0 * delta;
-        if (keys.a || keys.d) playerVelocity.x -= playerDirection.x * 400.0 * delta;
+        if (keys.w || keys.s) velocity.z -= direction.z * 400.0 * delta;
+        if (keys.a || keys.d) velocity.x -= direction.x * 400.0 * delta;
 
-        // 3. Collision Detection (Floor)
-        // We calculate the ground height at the player's EXACT position
+        // Floor Collision
         const groundHeight = getHeight(camera.position.x, camera.position.z);
-        
-        // The player is 1.6 units tall. If the camera Y is below ground + 1.6, we hit the floor.
         if (camera.position.y - 1.6 < groundHeight) {
-            playerVelocity.y = Math.max(0, playerVelocity.y);
-            camera.position.y = groundHeight + 1.6; // Snap to top of block
+            velocity.y = Math.max(0, velocity.y);
+            camera.position.y = groundHeight + 1.6;
             canJump = true;
         }
 
-        // Jump
         if (keys.space && canJump) {
-            playerVelocity.y = 12; // Jump force
+            velocity.y = 10;
             canJump = false;
         }
 
-        controls.moveRight(-playerVelocity.x * delta);
-        controls.moveForward(-playerVelocity.z * delta);
-        
-        // Apply Y movement manually since PointerLockControls only does X/Z
-        camera.position.y += playerVelocity.y * delta;
+        controls.moveRight(-velocity.x * delta);
+        controls.moveForward(-velocity.z * delta);
+        camera.position.y += velocity.y * delta;
     }
+
+    // 2. Stream chunks (Load 1 per frame)
+    updateChunks(scene, camera.position);
 
     renderer.render(scene, camera);
 }
 
-// Handle Window Resize
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();

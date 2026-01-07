@@ -2,49 +2,37 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft Web</title>
+    <title>Minecraft Map Update</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: monospace; user-select: none; }
         
-        /* THE CLICK TO START SCREEN */
-        #blocker {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); z-index: 100;
-            display: flex; align-items: center; justify-content: center;
-        }
-        #instructions {
-            color: white; font-size: 30px; text-align: center; cursor: pointer;
-            background: rgba(0,0,0,0.7); padding: 40px; border: 2px solid white;
-        }
+        /* START SCREEN */
+        #blocker { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: center; justify-content: center; }
+        #instructions { color: white; font-size: 30px; text-align: center; cursor: pointer; background: rgba(0,0,0,0.7); padding: 40px; border: 2px solid white; }
 
-        /* HUD ELEMENTS */
+        /* HUD */
         #info { position: absolute; top: 10px; left: 10px; color: white; font-weight: bold; text-shadow: 2px 2px 0 #000; z-index: 5; }
-        
-        #crosshair {
-            position: absolute; top: 50%; left: 50%; width: 14px; height: 14px;
-            border: 2px solid rgba(255,255,255,0.8); transform: translate(-50%, -50%); z-index: 5;
-            border-radius: 50%;
-        }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.8); transform: translate(-50%, -50%); z-index: 5; border-radius: 50%; }
 
-        #hotbar-container {
-            position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
-            display: flex; flex-direction: column; align-items: center; gap: 5px; z-index: 5;
+        /* MINIMAP */
+        #minimap-container {
+            position: absolute; top: 10px; right: 10px;
+            width: 150px; height: 150px;
+            border: 3px solid white; background: #000;
+            z-index: 50; transition: all 0.3s;
         }
+        #minimap-canvas { width: 100%; height: 100%; cursor: pointer; }
         
+        /* HOTBAR */
+        #hotbar-container { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 5px; z-index: 5; }
         #stats-bar { display: flex; gap: 20px; width: 400px; justify-content: space-between; }
         .bar-box { width: 150px; height: 15px; background: #333; border: 2px solid white; }
         #health-bar { background: #ff3333; width: 100%; height: 100%; }
         #hunger-bar { background: #ffaa00; width: 100%; height: 100%; }
-
         #hotbar { display: flex; gap: 4px; background: rgba(0,0,0,0.5); padding: 4px; }
-        .slot {
-            width: 40px; height: 40px; border: 2px solid #555; background: rgba(100,100,100,0.5);
-            color: white; display: flex; align-items: center; justify-content: center; font-size: 20px;
-        }
+        .slot { width: 40px; height: 40px; border: 2px solid #555; background: rgba(100,100,100,0.5); color: white; display: flex; align-items: center; justify-content: center; font-size: 20px; }
         .selected { border-color: white; background: rgba(200,200,200,0.5); }
     </style>
-    
-    <!-- LOAD THREE.JS FROM INTERNET -->
     <script type="importmap">
         { "imports": {
             "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
@@ -54,39 +42,25 @@
     </script>
 </head>
 <body>
-    <!-- START MENU -->
     <div id="blocker">
-        <div id="instructions">
-            CLICK HERE TO START<br>
-            <span style="font-size:20px">(W,A,S,D to Move, SPACE to Jump)</span>
-        </div>
+        <div id="instructions">CLICK TO PLAY<br><span style="font-size:20px">(Right click Map for Waypoints)</span></div>
     </div>
 
-    <!-- HUD -->
     <div id="info">
         <div id="coords">X: 0 Y: 0 Z: 0</div>
         <div id="players">Players: 1 / 20</div>
     </div>
     
-    <div id="crosshair"></div>
-    
-    <div id="hotbar-container">
-        <div id="stats-bar">
-            <div class="bar-box"><div id="health-bar"></div></div>
-            <div class="bar-box"><div id="hunger-bar"></div></div>
-        </div>
-        <div id="hotbar">
-            <div class="slot selected">🗡️</div>
-            <div class="slot">⛏️</div>
-            <div class="slot">🟩</div>
-            <div class="slot">🟫</div>
-            <div class="slot">🪵</div>
-            <div class="slot">🥩</div>
-            <div class="slot">💎</div>
-        </div>
+    <div id="minimap-container">
+        <canvas id="minimap-canvas" width="150" height="150"></canvas>
     </div>
 
-    <!-- IMPORTANT: THIS MUST POINT TO GAME.JS -->
+    <div id="crosshair"></div>
+    <div id="hotbar-container">
+        <div id="stats-bar"><div class="bar-box"><div id="health-bar"></div></div><div class="bar-box"><div id="hunger-bar"></div></div></div>
+        <div id="hotbar"><div class="slot selected">🗡️</div><div class="slot">⛏️</div><div class="slot">🟩</div><div class="slot">🟫</div><div class="slot">🪵</div><div class="slot">🥩</div><div class="slot">💎</div></div>
+    </div>
+
     <script type="module" src="./src/game.js"></script>
 </body>
 </html>

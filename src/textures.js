@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 
-// Procedural Texture Generator
 function createTexture(color, noise = 0.1, spots = []) {
     const cvs = document.createElement('canvas'); cvs.width = 64; cvs.height = 64;
     const ctx = cvs.getContext('2d');
@@ -12,13 +11,13 @@ function createTexture(color, noise = 0.1, spots = []) {
         ctx.fillRect(Math.random()*64, Math.random()*64, 2, 2);
     }
 
-    // Ore Spots
+    // Ore Spots (e.g., Diamonds)
     if(spots.length > 0) {
         spots.forEach(spotColor => {
-            for(let i=0; i<10; i++) { // 10 ore chunks
+            for(let i=0; i<8; i++) { 
                 ctx.fillStyle = spotColor;
                 const cx = Math.random()*50; const cy = Math.random()*50;
-                ctx.fillRect(cx, cy, 10, 10); // Big pixel ore
+                ctx.fillRect(cx, cy, 12, 12); 
             }
         });
     }
@@ -32,13 +31,12 @@ function createTexture(color, noise = 0.1, spots = []) {
 export const MATS = {
     GRASS: new THREE.MeshLambertMaterial({ map: createTexture('#567d46') }),
     DIRT:  new THREE.MeshLambertMaterial({ map: createTexture('#8B4513') }),
-    STONE: new THREE.MeshLambertMaterial({ map: createTexture('#808080') }),
+    STONE: new THREE.MeshLambertMaterial({ map: createTexture('#707070') }),
     WOOD:  new THREE.MeshLambertMaterial({ map: createTexture('#5C4033') }),
     LEAF:  new THREE.MeshLambertMaterial({ map: createTexture('#228B22') }),
     // ORES
-    COAL:    new THREE.MeshLambertMaterial({ map: createTexture('#808080', 0.1, ['#000000']) }),
-    IRON:    new THREE.MeshLambertMaterial({ map: createTexture('#808080', 0.1, ['#E6C288']) }),
-    DIAMOND: new THREE.MeshLambertMaterial({ map: createTexture('#808080', 0.1, ['#00FFFF']) }),
-    // UTILS
+    COAL:    new THREE.MeshLambertMaterial({ map: createTexture('#707070', 0.1, ['#000000']) }),
+    IRON:    new THREE.MeshLambertMaterial({ map: createTexture('#707070', 0.1, ['#E6C288']) }),
+    DIAMOND: new THREE.MeshLambertMaterial({ map: createTexture('#707070', 0.1, ['#00FFFF']) }),
     BEDROCK: new THREE.MeshLambertMaterial({ map: createTexture('#111111') })
 };

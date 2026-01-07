@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft Infinite + Textures</title>
+    <title>Minecraft Instant Load</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; }
         #ui {
@@ -19,12 +19,6 @@
             transform: translate(-50%, -50%); pointer-events: none;
             z-index: 10;
         }
-        #loading {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; color: white; display: flex;
-            align-items: center; justify-content: center; font-size: 30px;
-            z-index: 20;
-        }
     </style>
     <script type="importmap">
     {
@@ -37,11 +31,10 @@
     </script>
 </head>
 <body>
-    <div id="loading">Generating World...</div>
     <div id="ui">
-        Minecraft Infinite v3.0<br>
+        Minecraft v4.0 (Instant Load)<br>
         WASD to Move | SPACE to Jump<br>
-        Click to Lock Mouse
+        Click to Play
     </div>
     <div id="crosshair"></div>
     

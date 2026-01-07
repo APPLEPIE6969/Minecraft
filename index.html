@@ -2,49 +2,36 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft: Builder Edition</title>
+    <title>Minecraft Modular</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Courier New', sans-serif; }
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: monospace; }
         
-        /* UI OVERLAY */
-        #ui {
-            position: absolute; top: 10px; left: 10px;
-            color: white; font-weight: bold; 
-            text-shadow: 2px 2px 0 #000; pointer-events: none;
-            z-index: 10;
+        #hud {
+            position: absolute; width: 100%; height: 100%; pointer-events: none;
         }
         
-        /* CROSSHAIR */
+        #stats {
+            position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+            text-align: center; color: white; font-size: 20px; text-shadow: 2px 2px 0 #000;
+        }
+        
         #crosshair {
             position: absolute; top: 50%; left: 50%;
-            width: 20px; height: 20px;
-            background: transparent;
-            border: 2px solid rgba(255, 255, 255, 0.8);
-            border-radius: 50%;
-            transform: translate(-50%, -50%); pointer-events: none;
-            z-index: 10;
+            width: 16px; height: 16px;
+            background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='); /* Simple dot placeholder */
+            border: 2px solid rgba(255,255,255,0.8);
+            transform: translate(-50%, -50%);
         }
 
-        /* HOTBAR */
         #hotbar {
-            position: absolute; bottom: 20px; left: 50%;
-            transform: translateX(-50%);
+            position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
             display: flex; gap: 5px;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 5px; border-radius: 5px;
-            pointer-events: none; z-index: 10;
         }
+        
         .slot {
-            width: 50px; height: 50px;
-            border: 3px solid #555;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 24px; background: rgba(0,0,0,0.3);
-            color: white; text-shadow: 1px 1px 0 #000;
-        }
-        .active {
-            border-color: white;
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.1);
+            width: 50px; height: 50px; border: 4px solid #555; background: rgba(0,0,0,0.4);
+            display: flex; justify-content: center; align-items: center; font-size: 24px;
+            color: white;
         }
     </style>
     <script type="importmap">
@@ -58,23 +45,17 @@
     </script>
 </head>
 <body>
-    <div id="ui">
-        Minecraft Web v5.0<br>
-        WASD: Move | SPACE: Jump<br>
-        L-Click: Break | R-Click: Place<br>
-        1-5: Change Block
+    <div id="hud">
+        <div id="crosshair"></div>
+        <div id="stats">❤️❤️❤️❤️❤️<br>🍗🍗🍗🍗🍗</div>
+        <div id="hotbar">
+            <div class="slot">🟩</div>
+            <div class="slot">🟫</div>
+            <div class="slot">⬜</div>
+            <div class="slot">🪵</div>
+            <div class="slot">🌲</div>
+        </div>
     </div>
-    
-    <div id="crosshair"></div>
-    
-    <div id="hotbar">
-        <div class="slot active" id="slot1">🟩</div> <!-- Grass -->
-        <div class="slot" id="slot2">🟫</div> <!-- Dirt -->
-        <div class="slot" id="slot3">⬜</div> <!-- Stone -->
-        <div class="slot" id="slot4">🪵</div> <!-- Wood -->
-        <div class="slot" id="slot5">🍃</div> <!-- Leaves -->
-    </div>
-
-    <script type="module" src="./src/game.js"></script>
+    <script type="module" src="./src/main.js"></script>
 </body>
 </html>

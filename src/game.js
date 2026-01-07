@@ -1,30 +1,41 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-import { updateChunks, getHeight } from './world.js';
+import { updateChunks, getHeight, materials, geometry } from './world.js';
 
-// Setup
+// --- INIT ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
-scene.fog = new THREE.Fog(0x87CEEB, 10, 50);
+scene.fog = new THREE.Fog(0x87CEEB, 10, 60);
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: false });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// --- LIGHTING FIX (Crucial for textures) ---
-const ambient = new THREE.AmbientLight(0xffffff, 0.7); // Bright white fill light
-scene.add(ambient);
-
+// --- LIGHTS ---
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
 const sun = new THREE.DirectionalLight(0xffffff, 0.8);
 sun.position.set(50, 100, 50);
 scene.add(sun);
 
-// Controls
+// --- CONTROLS ---
 const controls = new PointerLockControls(camera, document.body);
 document.body.addEventListener('click', () => controls.lock());
 
-const keys = { w:false, a:false, s:false, d:false, space:false };
+// --- INVENTORY SYSTEM ---
+const hotbar = [materials.GRASS, materials.DIRT, materials.STONE, materials.WOOD, materials.LEAVES];
+let selectedSlot = 0;
+
+function selectSlot(index) {
+    selectedSlot = index;
+    // Update UI
+    document.querySelectorAll('.slot').forEach((el, i) => {
+        if(i === index) el.classList.add('active');
+        else el.classList.remove('active');
+    });
+}
+
+const keys = { w:0, a:0, s:0, d:0, space:0 };
 document.addEventListener('keydown', (e) => {
     switch(e.code) {
         case 'KeyW': keys.w = true; break;
@@ -32,6 +43,11 @@ document.addEventListener('keydown', (e) => {
         case 'KeyS': keys.s = true; break;
         case 'KeyD': keys.d = true; break;
         case 'Space': keys.space = true; break;
+        case 'Digit1': selectSlot(0); break;
+        case 'Digit2': selectSlot(1); break;
+        case 'Digit3': selectSlot(2); break;
+        case 'Digit4': selectSlot(3); break;
+        case 'Digit5': selectSlot(4); break;
     }
 });
 document.addEventListener('keyup', (e) => {
@@ -44,13 +60,54 @@ document.addEventListener('keyup', (e) => {
     }
 });
 
-// Physics Variables
+// --- INTERACTION (Break & Place) ---
+const raycaster = new THREE.Raycaster();
+const center = new THREE.Vector2(0, 0); // Screen center
+
+// Selection Box (The wireframe cursor)
+const selectorGeo = new THREE.BoxGeometry(1.01, 1.01, 1.01);
+const selectorMat = new THREE.LineBasicMaterial({ color: 0x000000 });
+const selector = new THREE.LineSegments(new THREE.EdgesGeometry(selectorGeo), selectorMat);
+selector.visible = false;
+scene.add(selector);
+
+document.addEventListener('mousedown', (e) => {
+    if(!controls.isLocked) return;
+    
+    // Raycast from camera center
+    raycaster.setFromCamera(center, camera);
+    // Intersect all meshes in scene (simple but effective for this scale)
+    const intersects = raycaster.intersectObjects(scene.children);
+
+    // Filter out selector and non-meshes
+    const validHit = intersects.find(hit => hit.object.isMesh && hit.distance < 8);
+
+    if(validHit) {
+        // Left Click (0) = Break
+        if(e.button === 0) {
+            scene.remove(validHit.object);
+            validHit.object.geometry.dispose(); // Cleanup memory
+        }
+        // Right Click (2) = Place
+        if(e.button === 2) {
+            const pos = new THREE.Vector3().copy(validHit.point).add(validHit.face.normal);
+            const newBlock = new THREE.Mesh(geometry, hotbar[selectedSlot]);
+            // Snap to grid
+            newBlock.position.copy(pos).floor().addScalar(0.5);
+            scene.add(newBlock);
+        }
+    }
+});
+
+// --- PHYSICS VARIABLES ---
 let velocityY = 0;
 const gravity = 25.0;
-const speed = 4.0; // Walk Speed
+const speed = 4.0;
+const playerHeight = 1.6;
+const bodyRadius = 0.3; 
 
-// Force load spawn
-updateChunks(scene, new THREE.Vector3(0,0,0)); 
+// Initial Spawn
+updateChunks(scene, new THREE.Vector3(0,0,0));
 const startY = getHeight(0, 0);
 camera.position.set(0, startY + 5, 0);
 
@@ -60,8 +117,21 @@ function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
 
+    // 1. UPDATE SELECTOR (Highlight box)
+    if(controls.isLocked) {
+        raycaster.setFromCamera(center, camera);
+        const intersects = raycaster.intersectObjects(scene.children);
+        const validHit = intersects.find(hit => hit.object.isMesh && hit.distance < 8);
+        if(validHit) {
+            selector.visible = true;
+            selector.position.copy(validHit.object.position);
+        } else {
+            selector.visible = false;
+        }
+    }
+
     if (controls.isLocked) {
-        // Movement Calculation
+        // 2. MOVEMENT
         const direction = new THREE.Vector3();
         direction.z = Number(keys.w) - Number(keys.s);
         direction.x = Number(keys.d) - Number(keys.a);
@@ -75,40 +145,38 @@ function animate() {
         const moveX = (forward.x * direction.z + right.x * direction.x) * speed * delta;
         const moveZ = (forward.z * direction.z + right.z * direction.x) * speed * delta;
 
-        // Collision Check (Wall Detection)
-        const currentPos = camera.position.clone();
-        
-        // X Axis Check
-        let targetX = currentPos.x + moveX;
-        let hX = getHeight(Math.round(targetX), Math.round(currentPos.z));
-        // If block is higher than knees (y-1) and we can't step up (y+0.5)
-        if (hX > currentPos.y - 1.0 && hX > currentPos.y + 0.5) {
-            targetX = currentPos.x; // Stop
-        }
+        camera.position.x += moveX;
+        camera.position.z += moveZ;
 
-        // Z Axis Check
-        let targetZ = currentPos.z + moveZ;
-        let hZ = getHeight(Math.round(targetX), Math.round(targetZ));
-        if (hZ > currentPos.y - 1.0 && hZ > currentPos.y + 0.5) {
-            targetZ = currentPos.z; // Stop
-        }
+        // 3. RAYCAST GRAVITY (The Real Physics Update)
+        // Instead of Math, we shoot a ray DOWN from feet to find the floor.
+        // This allows walking on placed blocks.
+        const rayDown = new THREE.Raycaster(camera.position, new THREE.Vector3(0, -1, 0), 0, 10);
+        const hits = rayDown.intersectObjects(scene.children);
+        // Find closest mesh below us
+        const ground = hits.find(h => h.object.isMesh);
 
-        camera.position.x = targetX;
-        camera.position.z = targetZ;
-
-        // Gravity
-        velocityY -= gravity * delta;
-        const groundHeight = getHeight(Math.round(camera.position.x), Math.round(camera.position.z));
-        
-        if (camera.position.y - 1.6 <= groundHeight) {
-            camera.position.y = groundHeight + 1.6;
+        if (ground && ground.distance < playerHeight) {
+            // We are on the ground
             velocityY = 0;
-            if (keys.space) velocityY = 9;
+            camera.position.y = ground.point.y + playerHeight; // Snap to top
+            
+            if (keys.space) velocityY = 9; // Jump
         } else {
-            camera.position.y += velocityY * delta;
+            // Falling
+            velocityY -= gravity * delta;
+        }
+
+        camera.position.y += velocityY * delta;
+
+        // "Void" safety (Respawn if fell through world)
+        if(camera.position.y < -20) {
+            camera.position.y = 50;
+            velocityY = 0;
         }
     }
 
+    // 4. GENERATE WORLD
     updateChunks(scene, camera.position);
     renderer.render(scene, camera);
 }

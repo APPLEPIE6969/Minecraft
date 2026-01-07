@@ -24,8 +24,40 @@ sun.position.set(50, 100, 50);
 sun.castShadow = true;
 scene.add(sun);
 
+// --- CONTROLS & CLICK FIX (Moved to Top) ---
+const controls = new PointerLockControls(camera, document.body);
+const blocker = document.getElementById('blocker');
+const settingsMenu = document.getElementById('settings-menu');
+const craftingMenu = document.getElementById('crafting-menu');
+let isMenuOpen = false;
+
+// FIX: Listen to the BLOCKER (Whole Screen), not just the text
+if (blocker) {
+    blocker.addEventListener('click', () => {
+        if (!isMenuOpen) controls.lock();
+    });
+}
+
+controls.addEventListener('lock', () => {
+    if(blocker) blocker.style.display = 'none';
+    if(settingsMenu) settingsMenu.style.display = 'none';
+    if(craftingMenu) craftingMenu.style.display = 'none';
+    isMenuOpen = false;
+});
+
+controls.addEventListener('unlock', () => {
+    if(!isMenuOpen && blocker) blocker.style.display = 'flex';
+});
+
 // --- SYSTEMS ---
-const socket = io(); // Multiplayer
+// FIX: Safety check for Multiplayer (Prevents crash if server is offline)
+let socket = null;
+if (typeof io !== 'undefined') {
+    socket = io();
+} else {
+    console.warn("Socket.io not found - Running in Singleplayer Mode");
+}
+
 const inventory = new Inventory();
 let renderDistance = 3;
 let sensitivity = 50;
@@ -33,7 +65,9 @@ let sensitivity = 50;
 // --- PLAYER ---
 const startX = Math.floor(Math.random()*20);
 const startZ = Math.floor(Math.random()*20);
-const ground = getSurfaceHeight(startX, startZ);
+let ground = 20;
+try { ground = getSurfaceHeight(startX, startZ); } catch(e){}
+
 const player = { 
     pos: new THREE.Vector3(startX, ground + 5, startZ), 
     vel: new THREE.Vector3(), 
@@ -46,51 +80,42 @@ updateWorld(scene, player.pos);
 const mobManager = new MobController(scene);
 const minimap = new Minimap(player);
 
-// --- RAYCASTER (Interaction) ---
+// --- RAYCASTER ---
 const raycaster = new THREE.Raycaster();
 const center = new THREE.Vector2(0,0);
 const placementGeo = new THREE.BoxGeometry(1,1,1);
 
 function handleInteraction(button) {
     raycaster.setFromCamera(center, camera);
-    // Intersect chunks
     const hits = raycaster.intersectObjects(scene.children, true);
-    // Filter for close objects (distance < 5) and ensure it's a mesh
-    const hit = hits.find(h => h.distance < 5 && h.object.isInstancedMesh);
+    const hit = hits.find(h => h.distance < 5 && (h.object.isInstancedMesh || h.object.isMesh));
 
     if (hit) {
-        // BREAK BLOCK (Left Click)
+        // BREAK (Left Click)
         if (button === 0) {
-            // Get instance ID and "remove" it (scale to 0)
-            const matrix = new THREE.Matrix4();
-            hit.object.getMatrixAt(hit.instanceId, matrix);
-            
-            // Scale to 0 to hide
-            matrix.makeScale(0, 0, 0);
-            hit.object.setMatrixAt(hit.instanceId, matrix);
-            hit.object.instanceMatrix.needsUpdate = true;
-
-            // Add drop to inventory
-            // Simple logic: If it's wood, give wood. If stone, give stone.
-            // In a full game, we'd map Instance ID to Block Type.
-            // For now, give generic items based on material guess
-            if(hit.object.material === MATS.WOOD) inventory.addItem('WOOD');
-            else if(hit.object.material === MATS.STONE) inventory.addItem('STONE');
-            else if(hit.object.material === MATS.DIRT) inventory.addItem('DIRT');
-            else if(hit.object.material === MATS.DIAMOND) inventory.addItem('DIAMOND');
-            else inventory.addItem('DIRT'); // Fallback
+            if (hit.object.isInstancedMesh) {
+                const matrix = new THREE.Matrix4();
+                hit.object.getMatrixAt(hit.instanceId, matrix);
+                matrix.makeScale(0, 0, 0);
+                hit.object.setMatrixAt(hit.instanceId, matrix);
+                hit.object.instanceMatrix.needsUpdate = true;
+                
+                // Inventory Logic
+                if(hit.object.material === MATS.WOOD) inventory.addItem('WOOD');
+                else if(hit.object.material === MATS.STONE) inventory.addItem('STONE');
+                else if(hit.object.material === MATS.DIRT) inventory.addItem('DIRT');
+                else if(hit.object.material === MATS.DIAMOND) inventory.addItem('DIAMOND');
+                else inventory.addItem('DIRT');
+            } else if (hit.object !== placementGeo) {
+                scene.remove(hit.object); // Remove placed blocks
+            }
         }
-
-        // PLACE BLOCK (Right Click)
+        // PLACE (Right Click)
         if (button === 2) {
             const item = inventory.getSelectedItem();
             if (item && item.placeable) {
-                // Calculate position against face
                 const p = new THREE.Vector3().copy(hit.point).add(hit.face.normal).floor().addScalar(0.5);
-                
-                // Don't place inside player
                 if (p.distanceTo(player.pos) > 1.5) {
-                    // Create a real mesh for placed blocks (easier than updating InstancedMesh)
                     const m = new THREE.Mesh(placementGeo, MATS[item.mat]);
                     m.position.copy(p);
                     scene.add(m);
@@ -102,24 +127,6 @@ function handleInteraction(button) {
 }
 
 // --- INPUTS ---
-const controls = new PointerLockControls(camera, document.body);
-const blocker = document.getElementById('blocker');
-const settingsMenu = document.getElementById('settings-menu');
-const craftingMenu = document.getElementById('crafting-menu');
-let isMenuOpen = false;
-
-document.getElementById('instructions').addEventListener('click', () => controls.lock());
-
-controls.addEventListener('lock', () => {
-    blocker.style.display = 'none';
-    settingsMenu.style.display = 'none';
-    craftingMenu.style.display = 'none';
-    isMenuOpen = false;
-});
-controls.addEventListener('unlock', () => {
-    if(!isMenuOpen) blocker.style.display = 'flex';
-});
-
 const keys = { w:0, a:0, s:0, d:0, sp:0, sh:0 };
 document.addEventListener('keydown', e => {
     if(e.code==='KeyW') keys.w=1;
@@ -150,52 +157,75 @@ document.addEventListener('wheel', (e) => {
     inventory.updateUI();
 });
 
-// --- SETTINGS LOGIC ---
-const sliderDist = document.getElementById('render-dist');
-const sliderSens = document.getElementById('sensitivity');
-const btnClose = document.getElementById('close-settings');
-
-// Apply Settings
-if(sliderDist) sliderDist.addEventListener('input', (e) => renderDistance = parseInt(e.target.value));
-if(sliderSens) sliderSens.addEventListener('input', (e) => sensitivity = parseInt(e.target.value));
-
+// UI Toggles
 function toggleSettings() {
     isMenuOpen = !isMenuOpen;
     if(isMenuOpen) {
         controls.unlock();
-        settingsMenu.style.display = 'block';
-        blocker.style.display = 'none';
+        if(settingsMenu) settingsMenu.style.display = 'block';
+        if(blocker) blocker.style.display = 'none';
     } else {
-        settingsMenu.style.display = 'none';
+        if(settingsMenu) settingsMenu.style.display = 'none';
         controls.lock();
     }
 }
-if(btnClose) btnClose.addEventListener('click', toggleSettings);
-
 function toggleCrafting() {
     isMenuOpen = !isMenuOpen;
     if(isMenuOpen) {
         controls.unlock();
-        craftingMenu.style.display = 'block';
+        if(craftingMenu) craftingMenu.style.display = 'block';
         inventory.updateCraftingUI();
-        blocker.style.display = 'none';
+        if(blocker) blocker.style.display = 'none';
     } else {
-        craftingMenu.style.display = 'none';
+        if(craftingMenu) craftingMenu.style.display = 'none';
         controls.lock();
     }
 }
+if(document.getElementById('close-settings')) document.getElementById('close-settings').addEventListener('click', toggleSettings);
 
-// --- GAME LOOP ---
+// --- MULTIPLAYER EVENTS ---
+const otherPlayers = {};
+const pMat = new THREE.MeshLambertMaterial({ color: 'red' });
+const pGeo = new THREE.BoxGeometry(0.6, 1.8, 0.6);
+
+if (socket) {
+    socket.on('currentPlayers', players => {
+        Object.keys(players).forEach(id => {
+            if(id !== socket.id) {
+                const m = new THREE.Mesh(pGeo, pMat);
+                m.position.set(players[id].x, players[id].y, players[id].z);
+                scene.add(m);
+                otherPlayers[id] = m;
+            }
+        });
+    });
+    socket.on('newPlayer', data => {
+        const m = new THREE.Mesh(pGeo, pMat);
+        m.position.set(data.player.x, data.player.y, data.player.z);
+        scene.add(m);
+        otherPlayers[data.id] = m;
+    });
+    socket.on('playerMoved', data => {
+        if(otherPlayers[data.id]) {
+            otherPlayers[data.id].position.set(data.pos.x, data.pos.y, data.pos.z);
+            otherPlayers[data.id].rotation.y = data.pos.r;
+        }
+    });
+    socket.on('playerDisconnected', id => {
+        if(otherPlayers[id]) { scene.remove(otherPlayers[id]); delete otherPlayers[id]; }
+    });
+}
+
+// --- LOOP ---
 const clock = new THREE.Clock();
 const elCoords = document.getElementById('coords');
+let emitTimer = 0;
 
 function animate() {
     requestAnimationFrame(animate);
     const delta = Math.min(clock.getDelta(), 0.1);
 
     if (controls.isLocked) {
-        // Sensitivity affects look speed (handled by PointerLock, but we can scale delta if needed)
-        // Physics Loop
         const speed = keys.sh ? 10.0 : 5.0;
         const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
         fwd.y=0; fwd.normalize();
@@ -211,37 +241,45 @@ function animate() {
 
         player.pos.add(move);
         
-        // Floor Clamping (Anti-Fall)
+        // PHYSICS
         const floorH = getSurfaceHeight(player.pos.x, player.pos.z);
         player.vel.y -= 30 * delta;
         player.pos.y += player.vel.y * delta;
 
+        // Anti-Fall
         if (player.pos.y < floorH + 1.8) {
             player.pos.y = floorH + 1.8;
             player.vel.y = 0;
             if (keys.sp) player.vel.y = 10;
         }
+        if (player.pos.y < -100) { player.pos.y = floorH + 20; player.vel.y = 0; }
 
         camera.position.copy(player.pos);
         
-        // Network Sync
-        socket.emit('playerMovement', { x:player.pos.x, y:player.pos.y, z:player.pos.z, r:camera.rotation.y });
+        // Socket Emit
+        if (socket) {
+            emitTimer += delta;
+            if(emitTimer > 0.05) {
+                emitTimer = 0;
+                socket.emit('playerMovement', { x:player.pos.x, y:player.pos.y, z:player.pos.z, r:camera.rotation.y });
+            }
+        }
 
-        elCoords.innerText = `X: ${Math.floor(player.pos.x)} Y: ${Math.floor(player.pos.y)} Z: ${Math.floor(player.pos.z)}`;
+        if(elCoords) elCoords.innerText = `X: ${Math.floor(player.pos.x)} Y: ${Math.floor(player.pos.y)} Z: ${Math.floor(player.pos.z)}`;
     }
 
-    mobManager.update(delta, player.pos);
-    minimap.update();
-    updateWorld(scene, player.pos); // Uses renderDistance variable internally if we updated function
+    if(mobManager) mobManager.update(delta, player.pos);
+    if(minimap) minimap.update();
+    updateWorld(scene, player.pos);
     renderer.render(scene, camera);
 }
 
-// Resize
+// Window Resize
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-inventory.updateUI(); // Init empty UI
+inventory.updateUI();
 animate();

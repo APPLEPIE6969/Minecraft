@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Web Minecraft - Biome Update</title>
+    <title>Minecraft Infinite + Textures</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; }
         #ui {
             position: absolute; top: 10px; left: 10px;
             color: white; font-family: 'Courier New', Courier, monospace;
             font-weight: bold; text-shadow: 2px 2px 0 #000; pointer-events: none;
+            z-index: 10;
         }
         #crosshair {
             position: absolute; top: 50%; left: 50%;
@@ -16,18 +17,14 @@
             background: transparent;
             border: 2px solid white; border-radius: 50%;
             transform: translate(-50%, -50%); pointer-events: none;
+            z-index: 10;
         }
-        #hotbar {
-            position: absolute; bottom: 20px; left: 50%;
-            transform: translateX(-50%);
-            display: flex; gap: 5px; pointer-events: none;
+        #loading {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; color: white; display: flex;
+            align-items: center; justify-content: center; font-size: 30px;
+            z-index: 20;
         }
-        .slot {
-            width: 40px; height: 40px; border: 3px solid #555; background: rgba(0,0,0,0.5);
-            color: white; display: flex; align-items: center; justify-content: center;
-            font-size: 20px;
-        }
-        .selected { border-color: white; background: rgba(255,255,255,0.2); }
     </style>
     <script type="importmap">
     {
@@ -40,19 +37,13 @@
     </script>
 </head>
 <body>
+    <div id="loading">Generating World...</div>
     <div id="ui">
-        Minecraft Web v2.0<br>
-        WASD to Move | Click to Mine/Place<br>
-        1-5 to Change Blocks
+        Minecraft Infinite v3.0<br>
+        WASD to Move | SPACE to Jump<br>
+        Click to Lock Mouse
     </div>
     <div id="crosshair"></div>
-    <div id="hotbar">
-        <div class="slot selected" id="slot1">🟩</div>
-        <div class="slot" id="slot2">🟫</div>
-        <div class="slot" id="slot3">⬜</div>
-        <div class="slot" id="slot4">🪵</div>
-        <div class="slot" id="slot5">🍃</div>
-    </div>
     
     <script type="module" src="./src/game.js"></script>
 </body>

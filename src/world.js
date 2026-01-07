@@ -3,92 +3,132 @@ import { createNoise2D } from 'simplex-noise';
 
 const noise2D = createNoise2D();
 
-// --- BLOCK DEFINITIONS ---
-// We use simple colors to represent materials for performance
-export const BLOCKS = {
-    GRASS: { color: 0x567d46, id: 1 },
-    DIRT: { color: 0x8B4513, id: 2 },
-    STONE: { color: 0x808080, id: 3 },
-    SAND: { color: 0xE6C288, id: 4 },
-    WATER: { color: 0x40a4df, id: 5 }, // Water biome
-    WOOD: { color: 0x5C4033, id: 6 },
-    LEAVES: { color: 0x228B22, id: 7 },
-    SNOW: { color: 0xFFFFFF, id: 8 }
-};
+// --- TEXTURE LOADER ---
+const loader = new THREE.TextureLoader();
 
-// Map hotbar keys to blocks
-export const HOTBAR = [BLOCKS.GRASS, BLOCKS.DIRT, BLOCKS.STONE, BLOCKS.WOOD, BLOCKS.LEAVES];
-
-export function getBlockMaterial(type) {
-    return new THREE.MeshStandardMaterial({ color: type.color });
+// Helper to load texture with "Pixelated" look (NearestFilter)
+function loadTexture(url) {
+    const tex = loader.load(url);
+    tex.magFilter = THREE.NearestFilter; // KEEPS IT PIXELATED
+    tex.minFilter = THREE.NearestFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
 }
 
-// --- WORLD GENERATION ---
-export function generateChunk(scene) {
-    const objects = [];
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
+// We use direct URLs for textures. 
+// You can replace these URLs with your own images if you want different packs.
+const textures = {
+    grassTop: loadTexture('https://raw.githubusercontent.com/ozcanzaferayan/minecraft-threejs/master/public/textures/grass.png'),
+    grassSide: loadTexture('https://raw.githubusercontent.com/ozcanzaferayan/minecraft-threejs/master/public/textures/grass_dirt.png'),
+    dirt: loadTexture('https://raw.githubusercontent.com/ozcanzaferayan/minecraft-threejs/master/public/textures/dirt.png'),
+    stone: loadTexture('https://raw.githubusercontent.com/ozcanzaferayan/minecraft-threejs/master/public/textures/stone.png'),
+    sand: loadTexture('https://raw.githubusercontent.com/ozcanzaferayan/minecraft-threejs/master/public/textures/sand.png'),
+    log: loadTexture('https://raw.githubusercontent.com/ozcanzaferayan/minecraft-threejs/master/public/textures/tree_side.png'),
+    leaves: loadTexture('https://raw.githubusercontent.com/ozcanzaferayan/minecraft-threejs/master/public/textures/leaves_oak.png')
+};
+
+// Materials array for the Mesh
+const materials = {
+    GRASS: [
+        new THREE.MeshStandardMaterial({ map: textures.grassSide }), // Right
+        new THREE.MeshStandardMaterial({ map: textures.grassSide }), // Left
+        new THREE.MeshStandardMaterial({ map: textures.grassTop }),  // Top
+        new THREE.MeshStandardMaterial({ map: textures.dirt }),      // Bottom
+        new THREE.MeshStandardMaterial({ map: textures.grassSide }), // Front
+        new THREE.MeshStandardMaterial({ map: textures.grassSide })  // Back
+    ],
+    DIRT: new THREE.MeshStandardMaterial({ map: textures.dirt }),
+    STONE: new THREE.MeshStandardMaterial({ map: textures.stone }),
+    SAND: new THREE.MeshStandardMaterial({ map: textures.sand }),
+    LOG: new THREE.MeshStandardMaterial({ map: textures.log }),
+    LEAVES: new THREE.MeshStandardMaterial({ map: textures.leaves, transparent: true, alphaTest: 0.5 })
+};
+
+// --- CHUNK SETTINGS ---
+export const CHUNK_SIZE = 16;
+export const RENDER_DISTANCE = 4; // Radius of chunks to draw
+const chunks = new Map(); // Store generated chunks
+
+export function getHeight(x, z) {
+    // Combine noises for better terrain
+    const globalBase = noise2D(x / 100, z / 100); // Big mountains
+    const localDetail = noise2D(x / 20, z / 20);  // Small bumps
     
-    const size = 30; // 30x30 chunks (Increase for bigger world, but lags browser)
+    // Math to create height
+    let y = Math.floor(globalBase * 10 + localDetail * 5); 
+    return y; 
+}
 
-    // Helper to add block
-    function addBlock(x, y, z, blockType) {
-        const mat = getBlockMaterial(blockType);
-        const mesh = new THREE.Mesh(geometry, mat);
-        mesh.position.set(x, y, z);
-        scene.add(mesh);
-        objects.push(mesh);
-        return mesh;
-    }
+export function updateChunks(scene, playerPos) {
+    const playerChunkX = Math.floor(playerPos.x / CHUNK_SIZE);
+    const playerChunkZ = Math.floor(playerPos.z / CHUNK_SIZE);
 
-    // Loop through x and z to create terrain
-    for (let x = -size; x < size; x++) {
-        for (let z = -size; z < size; z++) {
-            
-            // Generate Height using Noise
-            // Division controls "zoom" (higher number = smoother hills)
-            const noise = noise2D(x / 20, z / 20); 
-            let height = Math.floor(noise * 5); // Height varies between -5 and 5
+    // 1. Create new chunks
+    for (let x = -RENDER_DISTANCE; x <= RENDER_DISTANCE; x++) {
+        for (let z = -RENDER_DISTANCE; z <= RENDER_DISTANCE; z++) {
+            const chunkX = playerChunkX + x;
+            const chunkZ = playerChunkZ + z;
+            const key = `${chunkX},${chunkZ}`;
 
-            // --- BIOME LOGIC ---
-            
-            // 1. WATER & SAND (Low levels)
-            if (height < -2) {
-                // Fill water up to level -2
-                addBlock(x, -2, z, BLOCKS.WATER);
-                // Sand below water
-                addBlock(x, -3, z, BLOCKS.SAND);
-                continue; // Skip the rest for this coordinate
-            }
-
-            // 2. PLAINS & FOREST (Mid levels)
-            let surfaceBlock = BLOCKS.GRASS;
-            if (height < -1) surfaceBlock = BLOCKS.SAND; // Beach
-
-            // 3. SNOW & MOUNTAINS (High levels)
-            if (height > 3) surfaceBlock = BLOCKS.SNOW;
-
-            // Place the surface block
-            addBlock(x, height, z, surfaceBlock);
-
-            // Fill underneath with Dirt and Stone
-            addBlock(x, height - 1, z, BLOCKS.DIRT);
-            addBlock(x, height - 2, z, BLOCKS.STONE);
-
-            // --- TREES (Simple Procedural Generation) ---
-            // 1 in 50 chance to spawn a tree on grass
-            if (surfaceBlock === BLOCKS.GRASS && Math.random() > 0.98) {
-                // Trunk
-                addBlock(x, height + 1, z, BLOCKS.WOOD);
-                addBlock(x, height + 2, z, BLOCKS.WOOD);
-                addBlock(x, height + 3, z, BLOCKS.WOOD);
-                // Leaves
-                addBlock(x, height + 4, z, BLOCKS.LEAVES);
-                addBlock(x + 1, height + 3, z, BLOCKS.LEAVES);
-                addBlock(x - 1, height + 3, z, BLOCKS.LEAVES);
-                addBlock(x, height + 3, z + 1, BLOCKS.LEAVES);
-                addBlock(x, height + 3, z - 1, BLOCKS.LEAVES);
+            if (!chunks.has(key)) {
+                generateChunk(scene, chunkX, chunkZ);
             }
         }
     }
-    return objects;
+
+    // 2. Remove old chunks (Simple garbage collection)
+    for (const [key, chunkData] of chunks.entries()) {
+        const [cx, cz] = key.split(',').map(Number);
+        const dist = Math.sqrt((cx - playerChunkX)**2 + (cz - playerChunkZ)**2);
+        
+        if (dist > RENDER_DISTANCE + 2) {
+            // Too far away, delete it
+            chunkData.forEach(mesh => {
+                scene.remove(mesh);
+                mesh.geometry.dispose();
+            });
+            chunks.delete(key);
+        }
+    }
+    
+    return chunks; // Return map for collision checking
+}
+
+function generateChunk(scene, chunkX, chunkZ) {
+    const chunkMeshes = [];
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    
+    // We group blocks by type to optimize rendering
+    // This is a simplified approach. Real engines use instancing.
+    // For this code, we create standard meshes to ensure textures work easily for you.
+    
+    for (let x = 0; x < CHUNK_SIZE; x++) {
+        for (let z = 0; z < CHUNK_SIZE; z++) {
+            const worldX = chunkX * CHUNK_SIZE + x;
+            const worldZ = chunkZ * CHUNK_SIZE + z;
+            
+            const height = getHeight(worldX, worldZ);
+            
+            // Determine Block Type
+            let mat = materials.GRASS;
+            if (height < -3) mat = materials.SAND; // Water level
+            else if (height > 10) mat = materials.STONE; // Mountain peaks
+
+            const mesh = new THREE.Mesh(geometry, mat);
+            mesh.position.set(worldX, height, worldZ);
+            
+            scene.add(mesh);
+            chunkMeshes.push(mesh);
+
+            // Fill gaps below (optimization: only 2 layers deep)
+            if (height > -5) {
+                const dirt = new THREE.Mesh(geometry, materials.DIRT);
+                dirt.position.set(worldX, height - 1, worldZ);
+                scene.add(dirt);
+                chunkMeshes.push(dirt);
+            }
+        }
+    }
+    
+    chunks.set(`${chunkX},${chunkZ}`, chunkMeshes);
 }

@@ -2,43 +2,36 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft Feature Update</title>
+    <title>Minecraft Survival Update</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: monospace; user-select: none; }
         
-        /* OVERLAYS */
         #blocker { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: center; justify-content: center; }
         #instructions { color: white; font-size: 30px; text-align: center; cursor: pointer; background: rgba(0,0,0,0.7); padding: 40px; border: 2px solid white; }
         
-        /* SETTINGS MENU */
-        #settings-menu {
+        /* SETTINGS & CRAFTING */
+        .menu-window {
             display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 400px; background: #333; color: white; border: 2px solid white; padding: 20px; z-index: 200;
         }
-        #settings-menu h2 { text-align: center; margin-top: 0; }
-        .setting-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
-        button { cursor: pointer; padding: 5px 10px; }
-
+        .recipe-btn { padding: 10px; border: 1px solid #555; margin: 5px; cursor: pointer; background: #222; }
+        .recipe-btn:hover { background: #444; }
+        
         /* HUD */
         #info { position: absolute; top: 10px; left: 10px; color: white; font-weight: bold; text-shadow: 2px 2px 0 #000; z-index: 5; }
         #crosshair { position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.8); transform: translate(-50%, -50%); z-index: 5; border-radius: 50%; }
-
-        /* MINIMAP */
-        #minimap-container {
-            position: absolute; top: 10px; right: 10px; width: 150px; height: 150px;
-            border: 3px solid white; background: #000; z-index: 50;
-        }
-        #minimap-canvas { width: 100%; height: 100%; }
-
-        /* HOTBAR */
         #hotbar-container { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 5px; z-index: 5; }
-        #stats-bar { display: flex; gap: 20px; width: 400px; justify-content: space-between; }
-        .bar-box { width: 150px; height: 15px; background: #333; border: 2px solid white; }
-        #health-bar { background: #ff3333; width: 100%; height: 100%; }
-        #hunger-bar { background: #ffaa00; width: 100%; height: 100%; }
         #hotbar { display: flex; gap: 4px; background: rgba(0,0,0,0.5); padding: 4px; }
-        .slot { width: 40px; height: 40px; border: 2px solid #555; background: rgba(100,100,100,0.5); color: white; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .selected { border-color: white; background: rgba(200,200,200,0.5); transform: scale(1.1); }
+        
+        .slot { 
+            width: 50px; height: 50px; border: 2px solid #555; background: rgba(0,0,0,0.5); 
+            color: white; display: flex; align-items: center; justify-content: center; font-size: 24px; position: relative;
+        }
+        .slot::after { content: attr(data-count); position: absolute; bottom: 2px; right: 2px; font-size: 12px; }
+        .selected { border-color: white; background: rgba(255,255,255,0.2); transform: scale(1.1); }
+
+        #minimap-container { position: absolute; top: 10px; right: 10px; width: 150px; height: 150px; border: 3px solid white; background: #000; z-index: 50; }
+        #minimap-canvas { width: 100%; height: 100%; }
     </style>
     <script type="importmap">
         { "imports": {
@@ -51,41 +44,34 @@
 </head>
 <body>
     <div id="blocker">
-        <div id="instructions">CLICK TO PLAY<br><span style="font-size:16px">Press 'P' for Settings</span></div>
+        <div id="instructions">CLICK TO PLAY<br><span style="font-size:16px">P = Settings | E = Crafting</span></div>
     </div>
 
-    <!-- SETTINGS MENU -->
-    <div id="settings-menu">
-        <h2>OPTIONS</h2>
-        <div class="setting-row">
-            <span>Render Distance</span>
-            <input type="range" min="2" max="10" value="3">
-        </div>
-        <div class="setting-row">
-            <span>Mouse Sensitivity</span>
-            <input type="range" min="1" max="100" value="50">
-        </div>
-        <div class="setting-row">
-            <span>Controls</span>
-            <div style="text-align:right">WASD = Move<br>SPACE = Jump<br>P = Menu</div>
-        </div>
-        <div style="text-align:center; margin-top:20px;">
-            <button id="close-settings">Back to Game</button>
-        </div>
+    <!-- SETTINGS -->
+    <div id="settings-menu" class="menu-window">
+        <h2>SETTINGS</h2>
+        <div>Render Distance: <input id="render-dist" type="range" min="2" max="10" value="3"></div>
+        <div>Sensitivity: <input id="sensitivity" type="range" min="1" max="100" value="50"></div>
+        <div style="margin-top:20px; text-align:center"><button id="close-settings">Back</button></div>
+    </div>
+
+    <!-- CRAFTING -->
+    <div id="crafting-menu" class="menu-window">
+        <h2>CRAFTING</h2>
+        <div id="crafting-list"></div>
+        <div style="margin-top:20px; text-align:center"><button onclick="document.getElementById('crafting-menu').style.display='none'">Close</button></div>
     </div>
 
     <div id="info"><div id="coords">Init...</div></div>
-    
-    <div id="minimap-container">
-        <canvas id="minimap-canvas" width="150" height="150"></canvas>
-    </div>
-
+    <div id="minimap-container"><canvas id="minimap-canvas" width="150" height="150"></canvas></div>
     <div id="crosshair"></div>
+
     <div id="hotbar-container">
-        <div id="stats-bar"><div class="bar-box"><div id="health-bar"></div></div><div class="bar-box"><div id="hunger-bar"></div></div></div>
         <div id="hotbar">
-            <div class="slot selected">🗡️</div><div class="slot">⛏️</div><div class="slot">🟩</div>
-            <div class="slot">🟫</div><div class="slot">🪵</div><div class="slot">🥩</div><div class="slot">💎</div>
+            <!-- 9 Slots -->
+            <div class="slot"></div><div class="slot"></div><div class="slot"></div>
+            <div class="slot"></div><div class="slot"></div><div class="slot"></div>
+            <div class="slot"></div><div class="slot"></div><div class="slot"></div>
         </div>
     </div>
 

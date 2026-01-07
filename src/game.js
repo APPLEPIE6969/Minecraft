@@ -1,108 +1,157 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-import { generateTerrain, placeBlock } from './world.js';
+import { generateChunk, getBlockMaterial, HOTBAR } from './world.js';
 
 // --- SETUP ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
 scene.fog = new THREE.Fog(0x87CEEB, 10, 50);
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.y = 2;
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+// Start high up so we don't spawn inside a mountain
+camera.position.set(0, 10, 0);
 
-const renderer = new THREE.WebGLRenderer();
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
 // --- LIGHTS ---
-const sun = new THREE.DirectionalLight(0xffffff, 1.5);
-sun.position.set(10, 20, 10);
+const ambient = new THREE.AmbientLight(0xaaaaaa);
+scene.add(ambient);
+
+const sun = new THREE.DirectionalLight(0xffffff, 1);
+sun.position.set(50, 50, 50);
 sun.castShadow = true;
 scene.add(sun);
-scene.add(new THREE.AmbientLight(0x404040));
 
 // --- CONTROLS ---
 const controls = new PointerLockControls(camera, document.body);
-document.body.addEventListener('click', () => controls.lock());
+document.body.addEventListener('click', () => {
+    if (!controls.isLocked) controls.lock();
+});
 
-// Movement variables
-const velocity = new THREE.Vector3();
-const direction = new THREE.Vector3();
-let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-
-document.addEventListener('keydown', (event) => {
-    switch (event.code) {
-        case 'KeyW': moveForward = true; break;
-        case 'KeyA': moveLeft = true; break;
-        case 'KeyS': moveBackward = true; break;
-        case 'KeyD': moveRight = true; break;
+// Keys
+const keys = { w: false, a: false, s: false, d: false, space: false, shift: false };
+document.addEventListener('keydown', (e) => {
+    switch(e.key.toLowerCase()) {
+        case 'w': keys.w = true; break;
+        case 'a': keys.a = true; break;
+        case 's': keys.s = true; break;
+        case 'd': keys.d = true; break;
+        case ' ': keys.space = true; break;
+        case 'shift': keys.shift = true; break;
+        // Inventory Selection
+        case '1': selectSlot(0); break;
+        case '2': selectSlot(1); break;
+        case '3': selectSlot(2); break;
+        case '4': selectSlot(3); break;
+        case '5': selectSlot(4); break;
+    }
+});
+document.addEventListener('keyup', (e) => {
+    switch(e.key.toLowerCase()) {
+        case 'w': keys.w = false; break;
+        case 'a': keys.a = false; break;
+        case 's': keys.s = false; break;
+        case 'd': keys.d = false; break;
+        case ' ': keys.space = false; break;
+        case 'shift': keys.shift = false; break;
     }
 });
 
-document.addEventListener('keyup', (event) => {
-    switch (event.code) {
-        case 'KeyW': moveForward = false; break;
-        case 'KeyA': moveLeft = false; break;
-        case 'KeyS': moveBackward = false; break;
-        case 'KeyD': moveRight = false; break;
-    }
-});
+// --- INVENTORY SYSTEM ---
+let selectedBlockType = HOTBAR[0];
 
-// --- WORLD GENERATION ---
-// We import the terrain logic from our other file
-const terrainObjects = generateTerrain(scene); 
-const allBlocks = [...terrainObjects]; // Keep track of everything for raycasting
+function selectSlot(index) {
+    selectedBlockType = HOTBAR[index];
+    // Update UI
+    document.querySelectorAll('.slot').forEach(el => el.classList.remove('selected'));
+    document.getElementById(`slot${index+1}`).classList.add('selected');
+}
 
-// --- INTERACTION (Placing Blocks) ---
+// --- WORLD ---
+const chunks = generateChunk(scene);
+let allBlocks = [...chunks]; 
+
+// --- INTERACTION ---
 const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2(0, 0); // Center of screen
+const mouse = new THREE.Vector2(0,0);
 
 document.addEventListener('mousedown', (event) => {
-    if(controls.isLocked && event.button === 0) { // Left click
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(allBlocks);
+    if (!controls.isLocked) return;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(allBlocks);
+
+    if (intersects.length > 0) {
+        const intersect = intersects[0];
         
-        if(intersects.length > 0) {
-            const intersect = intersects[0];
-            // Calculate position: Point of impact + Normal (direction face is pointing)
-            const position = new THREE.Vector3().copy(intersect.point).add(intersect.face.normal);
+        // Left Click (0) = Destroy
+        if (event.button === 0) {
+            scene.remove(intersect.object);
+            // Remove from array (slow method but works for now)
+            allBlocks = allBlocks.filter(b => b !== intersect.object);
+        }
+        
+        // Right Click (2) = Place
+        if (event.button === 2) {
+            const pos = new THREE.Vector3().copy(intersect.point).add(intersect.face.normal);
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const material = getBlockMaterial(selectedBlockType);
+            const newBlock = new THREE.Mesh(geometry, material);
             
-            const newBlock = placeBlock(scene, position);
+            newBlock.position.copy(pos).floor().addScalar(0.5);
+            
+            scene.add(newBlock);
             allBlocks.push(newBlock);
         }
     }
 });
 
-// --- ANIMATION LOOP ---
-let prevTime = performance.now();
+// --- PHYSICS (Simple Gravity) ---
+let velocityY = 0;
+const gravity = -0.5; // Gravity strength
+
+function updatePhysics() {
+    // Very simple collision detection (Floor at Y= -3 roughly)
+    // Real Minecraft needs AABB collision, this is a placeholder
+    if (camera.position.y > 2) {
+        velocityY += gravity * 0.05;
+    } else {
+        velocityY = 0;
+        camera.position.y = 2; // Snap to ground
+    }
+    
+    if (keys.space && camera.position.y <= 2.1) {
+        velocityY = 0.2; // Jump
+    }
+    
+    camera.position.y += velocityY;
+}
+
+// --- ANIMATION ---
+const clock = new THREE.Clock();
 
 function animate() {
     requestAnimationFrame(animate);
-
-    const time = performance.now();
-    const delta = (time - prevTime) / 1000;
+    const delta = clock.getDelta();
 
     if (controls.isLocked) {
-        velocity.x -= velocity.x * 10.0 * delta;
-        velocity.z -= velocity.z * 10.0 * delta;
-
-        direction.z = Number(moveForward) - Number(moveBackward);
-        direction.x = Number(moveRight) - Number(moveLeft);
-        direction.normalize();
-
-        if (moveForward || moveBackward) velocity.z -= direction.z * 100.0 * delta;
-        if (moveLeft || moveRight) velocity.x -= direction.x * 100.0 * delta;
-
-        controls.moveRight(-velocity.x * delta);
-        controls.moveForward(-velocity.z * delta);
+        updatePhysics();
+        
+        const speed = 10 * delta;
+        if (keys.w) controls.moveForward(speed);
+        if (keys.s) controls.moveForward(-speed);
+        if (keys.a) controls.moveRight(-speed);
+        if (keys.d) controls.moveRight(speed);
+        if (keys.shift) camera.position.y -= speed; // Fly down/Sneak
     }
 
-    prevTime = time;
     renderer.render(scene, camera);
 }
 
-// Resize Helper
+// Window Resize
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();

@@ -2,21 +2,46 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft with Mobs</title>
+    <title>Minecraft Survival</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: monospace; }
-        #ui {
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            color: white; font-size: 24px; font-weight: bold;
-            text-align: center;
-            background: rgba(0,0,0,0.5); padding: 20px; border-radius: 10px;
-            pointer-events: none; /* Allows click to pass through to body */
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: monospace; user-select: none; }
+        
+        /* TOP LEFT: INFO */
+        #info {
+            position: absolute; top: 10px; left: 10px;
+            color: white; font-weight: bold; text-shadow: 2px 2px 0 #000;
         }
+
+        /* BOTTOM CENTER: HOTBAR */
+        #hotbar-container {
+            position: absolute; bottom: 10px; left: 50%;
+            transform: translateX(-50%);
+            display: flex; flex-direction: column; align-items: center;
+            gap: 5px;
+        }
+        
+        #stats-bar {
+            display: flex; gap: 20px; width: 400px; justify-content: space-between;
+        }
+        
+        .bar-box { width: 150px; height: 15px; background: #333; border: 2px solid white; position: relative; }
+        .bar-fill { height: 100%; transition: width 0.2s; }
+        #health-bar { background: #ff3333; width: 100%; }
+        #hunger-bar { background: #ffaa00; width: 100%; }
+
+        #hotbar {
+            display: flex; gap: 4px; background: rgba(0,0,0,0.5); padding: 4px;
+        }
+        .slot {
+            width: 40px; height: 40px; border: 2px solid #555; background: rgba(100,100,100,0.5);
+            color: white; display: flex; align-items: center; justify-content: center; font-size: 20px;
+        }
+        .selected { border-color: white; background: rgba(200,200,200,0.5); }
+
         #crosshair {
-            position: absolute; top: 50%; left: 50%;
-            width: 10px; height: 10px;
-            border: 2px solid white; border-radius: 50%;
+            position: absolute; top: 50%; left: 50%; width: 14px; height: 14px;
+            background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==');
+            border: 2px solid rgba(255,255,255,0.8);
             transform: translate(-50%, -50%);
         }
     </style>
@@ -29,8 +54,29 @@
     </script>
 </head>
 <body>
-    <div id="ui">CLICK ANYWHERE TO START</div>
+    <div id="info">
+        <div id="coords">X: 0 Y: 0 Z: 0</div>
+        <div id="players">Players: 1 / 20</div>
+    </div>
+
     <div id="crosshair"></div>
-    <script type="module" src="./src/main.js"></script>
+
+    <div id="hotbar-container">
+        <div id="stats-bar">
+            <div class="bar-box"><div id="health-bar" class="bar-fill"></div></div>
+            <div class="bar-box"><div id="hunger-bar" class="bar-fill"></div></div>
+        </div>
+        <div id="hotbar">
+            <div class="slot selected">🗡️</div>
+            <div class="slot">⛏️</div>
+            <div class="slot">🟩</div>
+            <div class="slot">🟫</div>
+            <div class="slot">🪵</div>
+            <div class="slot">🥩</div>
+            <div class="slot">💎</div>
+        </div>
+    </div>
+
+    <script type="module" src="./src/game.js"></script>
 </body>
 </html>

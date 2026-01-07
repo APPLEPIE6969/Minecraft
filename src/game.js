@@ -3,7 +3,7 @@ import { PointerLockControls } from 'three/addons/controls/PointerLockControls.j
 import { updateWorld, isSolid, getSurfaceHeight } from './world.js';
 import { MobController } from './mobs.js';
 
-// --- 1. SETUP ---
+// --- SETUP ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
 scene.fog = new THREE.Fog(0x87CEEB, 20, 60);
@@ -21,35 +21,25 @@ sun.position.set(50, 100, 50);
 sun.castShadow = true;
 scene.add(sun);
 
-// --- 2. CLICK TO START (Essential Fix) ---
+// --- START SCREEN LOGIC ---
 const controls = new PointerLockControls(camera, document.body);
 const blocker = document.getElementById('blocker');
 const instructions = document.getElementById('instructions');
 
-if (instructions) {
+if(instructions) {
     instructions.addEventListener('click', () => controls.lock());
-} else {
-    // Fallback if HTML is missing the blocker
-    document.body.addEventListener('click', () => controls.lock());
 }
+controls.addEventListener('lock', () => { if(blocker) blocker.style.display = 'none'; });
+controls.addEventListener('unlock', () => { if(blocker) blocker.style.display = 'flex'; });
 
-controls.addEventListener('lock', () => {
-    if(blocker) blocker.style.display = 'none';
-});
-
-controls.addEventListener('unlock', () => {
-    if(blocker) blocker.style.display = 'flex';
-});
-
-// --- 3. PLAYER SETUP ---
-const startX = 0;
+// --- PLAYER ---
+const startX = 0; 
 const startZ = 0;
-// Calculate ground height so you don't fall through
-let groundLevel = 20; 
-try { groundLevel = getSurfaceHeight(startX, startZ); } catch(e) { console.log("World loading..."); }
+let groundH = 20;
+try { groundH = getSurfaceHeight(startX, startZ); } catch(e) {}
 
 const player = { 
-    pos: new THREE.Vector3(startX, groundLevel + 8, startZ), 
+    pos: new THREE.Vector3(startX, groundH + 5, startZ), 
     vel: new THREE.Vector3(), 
     w: 0.6, h: 1.8 
 };
@@ -58,9 +48,9 @@ const player = {
 updateWorld(scene, player.pos);
 camera.position.copy(player.pos);
 
-// Mobs (Safe Load)
-let mobManager = null;
-try { mobManager = new MobController(scene); } catch(e) {}
+// Mobs (Safe Mode)
+let mobManager;
+try { mobManager = new MobController(scene); } catch(e) { console.log("No mobs found"); }
 
 // Input
 const keys = { w:0, a:0, s:0, d:0, sp:0, sh:0 };
@@ -81,7 +71,7 @@ document.addEventListener('keyup', e => {
     if(e.code==='ShiftLeft') keys.sh=0;
 });
 
-// --- 4. PHYSICS ENGINE ---
+// --- PHYSICS ---
 function checkCol(x, y, z) {
     const minX = Math.floor(x - player.w/2), maxX = Math.floor(x + player.w/2);
     const minZ = Math.floor(z - player.w/2), maxZ = Math.floor(z + player.w/2);
@@ -97,7 +87,7 @@ function checkCol(x, y, z) {
     return false;
 }
 
-// --- 5. GAME LOOP ---
+// --- LOOP ---
 const clock = new THREE.Clock();
 const elCoords = document.getElementById('coords');
 
@@ -120,11 +110,9 @@ function animate() {
         
         if(move.length()>0) move.normalize().multiplyScalar(speed*delta);
 
-        // Movement with Collision
         if(!checkCol(player.pos.x+move.x, player.pos.y, player.pos.z)) player.pos.x += move.x;
         if(!checkCol(player.pos.x, player.pos.y, player.pos.z+move.z)) player.pos.z += move.z;
 
-        // Gravity
         player.vel.y -= 25 * delta;
         const nextY = player.pos.y + player.vel.y * delta;
 
@@ -140,8 +128,7 @@ function animate() {
             }
         }
 
-        // Void Safety
-        if(player.pos.y < -100) { player.pos.y = 60; player.vel.y = 0; }
+        if(player.pos.y < -100) { player.pos.y = 100; player.vel.y = 0; }
 
         camera.position.copy(player.pos);
         camera.position.y += 1.6;
@@ -154,7 +141,6 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// Window Resize
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();

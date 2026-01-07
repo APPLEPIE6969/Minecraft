@@ -5,25 +5,26 @@ import { updateChunks, getHeight } from './world.js';
 // Setup
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
-scene.fog = new THREE.Fog(0x87CEEB, 20, 70);
+// Fog hides the chunk loading edge
+scene.fog = new THREE.Fog(0x87CEEB, 10, 40); 
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ antialias: false });
+const renderer = new THREE.WebGLRenderer({ 
+    powerPreference: "high-performance", // Hints computer to use GPU
+    antialias: false 
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// Lighting
-const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+// We switched to BasicMaterial (faster), so we don't strictly need lights,
+// but we keep a simple one just in case you add other objects later.
+const ambient = new THREE.AmbientLight(0xffffff, 1.0);
 scene.add(ambient);
-const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-sun.position.set(50, 100, 50);
-scene.add(sun);
 
 // Controls
 const controls = new PointerLockControls(camera, document.body);
 document.body.addEventListener('click', () => controls.lock());
 
-// Input
 const keys = { w:false, a:false, s:false, d:false, space:false };
 document.addEventListener('keydown', (e) => {
     if(e.code === 'KeyW') keys.w = true;
@@ -46,11 +47,8 @@ const direction = new THREE.Vector3();
 let canJump = false;
 const gravity = 25.0;
 
-// Force generate the chunk UNDER the player immediately so you don't fall
-// The rest will load in background
+// Force load spawn
 updateChunks(scene, new THREE.Vector3(0,0,0)); 
-
-// Set Spawn Point
 const startY = getHeight(0, 0);
 camera.position.set(0, startY + 5, 0);
 
@@ -60,20 +58,23 @@ function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
 
-    // 1. Physics (Always runs, even if chunk isn't visible yet)
     if (controls.isLocked) {
-        velocity.x -= velocity.x * 10.0 * delta;
-        velocity.z -= velocity.z * 10.0 * delta;
+        // Friction: Slows you down when you stop pressing keys
+        velocity.x -= velocity.x * 5.0 * delta; // Lower friction for smoother stop
+        velocity.z -= velocity.z * 5.0 * delta;
         velocity.y -= gravity * delta;
 
         direction.z = Number(keys.w) - Number(keys.s);
         direction.x = Number(keys.d) - Number(keys.a);
         direction.normalize();
 
-        if (keys.w || keys.s) velocity.z -= direction.z * 400.0 * delta;
-        if (keys.a || keys.d) velocity.x -= direction.x * 400.0 * delta;
+        // MOVEMENT SPEED ADJUSTMENT
+        // Previous value: 400.0 (Too fast)
+        // New value: 50.0 (Walking speed)
+        if (keys.w || keys.s) velocity.z -= direction.z * 50.0 * delta;
+        if (keys.a || keys.d) velocity.x -= direction.x * 50.0 * delta;
 
-        // Floor Collision
+        // Ground Collision
         const groundHeight = getHeight(camera.position.x, camera.position.z);
         if (camera.position.y - 1.6 < groundHeight) {
             velocity.y = Math.max(0, velocity.y);
@@ -91,9 +92,7 @@ function animate() {
         camera.position.y += velocity.y * delta;
     }
 
-    // 2. Stream chunks (Load 1 per frame)
     updateChunks(scene, camera.position);
-
     renderer.render(scene, camera);
 }
 

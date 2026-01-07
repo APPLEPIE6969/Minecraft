@@ -2,22 +2,49 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft Instant Load</title>
+    <title>Minecraft: Builder Edition</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; }
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Courier New', sans-serif; }
+        
+        /* UI OVERLAY */
         #ui {
             position: absolute; top: 10px; left: 10px;
-            color: white; font-family: 'Courier New', Courier, monospace;
-            font-weight: bold; text-shadow: 2px 2px 0 #000; pointer-events: none;
+            color: white; font-weight: bold; 
+            text-shadow: 2px 2px 0 #000; pointer-events: none;
             z-index: 10;
         }
+        
+        /* CROSSHAIR */
         #crosshair {
             position: absolute; top: 50%; left: 50%;
             width: 20px; height: 20px;
             background: transparent;
-            border: 2px solid white; border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
             transform: translate(-50%, -50%); pointer-events: none;
             z-index: 10;
+        }
+
+        /* HOTBAR */
+        #hotbar {
+            position: absolute; bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            display: flex; gap: 5px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px; border-radius: 5px;
+            pointer-events: none; z-index: 10;
+        }
+        .slot {
+            width: 50px; height: 50px;
+            border: 3px solid #555;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; background: rgba(0,0,0,0.3);
+            color: white; text-shadow: 1px 1px 0 #000;
+        }
+        .active {
+            border-color: white;
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
         }
     </style>
     <script type="importmap">
@@ -32,12 +59,22 @@
 </head>
 <body>
     <div id="ui">
-        Minecraft v4.0 (Instant Load)<br>
-        WASD to Move | SPACE to Jump<br>
-        Click to Play
+        Minecraft Web v5.0<br>
+        WASD: Move | SPACE: Jump<br>
+        L-Click: Break | R-Click: Place<br>
+        1-5: Change Block
     </div>
+    
     <div id="crosshair"></div>
     
+    <div id="hotbar">
+        <div class="slot active" id="slot1">🟩</div> <!-- Grass -->
+        <div class="slot" id="slot2">🟫</div> <!-- Dirt -->
+        <div class="slot" id="slot3">⬜</div> <!-- Stone -->
+        <div class="slot" id="slot4">🪵</div> <!-- Wood -->
+        <div class="slot" id="slot5">🍃</div> <!-- Leaves -->
+    </div>
+
     <script type="module" src="./src/game.js"></script>
 </body>
 </html>

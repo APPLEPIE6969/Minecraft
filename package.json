@@ -1,7 +1,6 @@
 {
-  "name": "minecraft-multiplayer",
+  "name": "minecraft-server",
   "version": "1.0.0",
-  "description": "Real Multiplayer Minecraft",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

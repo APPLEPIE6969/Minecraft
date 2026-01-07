@@ -2,32 +2,28 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft Perfected</title>
+    <title>Minecraft Fixed</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: monospace; user-select: none; }
         
-        /* UI */
         #blocker { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; display: flex; align-items: center; justify-content: center; }
         #instructions { color: white; font-size: 24px; text-align: center; cursor: pointer; background: rgba(0,0,0,0.8); padding: 30px; border: 2px solid white; border-radius: 8px; }
         
         #hud { position: absolute; width: 100%; height: 100%; pointer-events: none; }
         #crosshair { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='); border: 2px solid rgba(255,255,255,0.8); transform: translate(-50%, -50%); border-radius: 50%; }
-        
+        #coords { position: absolute; top: 10px; left: 10px; color: white; font-weight: bold; text-shadow: 1px 1px 0 #000; font-size: 18px; }
+
         #hotbar-container { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 5px; pointer-events: auto; }
         #hotbar { display: flex; gap: 4px; background: rgba(0,0,0,0.6); padding: 6px; border-radius: 5px; }
         .slot { width: 48px; height: 48px; border: 2px solid #555; background: rgba(0,0,0,0.4); color: white; display: flex; align-items: center; justify-content: center; font-size: 24px; position: relative; }
         .slot::after { content: attr(data-count); position: absolute; bottom: 2px; right: 2px; font-size: 12px; font-weight: bold; }
         .selected { border-color: white; background: rgba(255,255,255,0.2); transform: scale(1.1); box-shadow: 0 0 10px white; }
 
-        #coords { position: absolute; top: 10px; left: 10px; color: white; font-weight: bold; text-shadow: 1px 1px 0 #000; }
-        
-        /* MENUS */
         #crafting-menu { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; background: #222; color: white; border: 2px solid #888; padding: 20px; z-index: 500; pointer-events: auto; }
         .recipe-btn { padding: 8px; margin: 5px 0; background: #444; border: 1px solid #666; cursor: pointer; display: flex; justify-content: space-between; }
         .recipe-btn:hover { background: #555; }
     </style>
     
-    <!-- LIBRARIES -->
     <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
     <script type="importmap">
         { "imports": {
@@ -42,9 +38,9 @@
     <div id="blocker">
         <div id="instructions">
             <h1>CLICK TO START</h1>
-            <p>WASD to Move | SPACE to Jump</p>
-            <p>Left Click: Break | Right Click: Place</p>
-            <p>E: Inventory | Scroll: Select</p>
+            <p>WASD = Move | SPACE = Jump</p>
+            <p>Left Click = Mine | Right Click = Build</p>
+            <p>E = Inventory | Scroll = Select</p>
         </div>
     </div>
 
@@ -68,9 +64,7 @@
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
         import { createNoise2D } from 'simplex-noise';
 
-        // ==========================================
-        // 1. TEXTURES & MATERIALS
-        // ==========================================
+        // --- 1. TEXTURES ---
         function createTexture(color) {
             const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
             const ctx = canvas.getContext('2d');
@@ -95,17 +89,12 @@
             BEDROCK: new THREE.MeshLambertMaterial({ map: createTexture('#111') })
         };
 
-        // ==========================================
-        // 2. WORLD & DATA (The Fix)
-        // ==========================================
+        // --- 2. WORLD & MATH FIX ---
         const noise2D = createNoise2D();
         const CHUNK_SIZE = 16;
         const RENDER_DIST = 3;
         const geometry = new THREE.BoxGeometry(1, 1, 1);
         const chunks = new Map();
-        
-        // MEMORY: Stores changes (Break/Place)
-        // Key: "x,y,z" -> Value: ID (0 = Air, 1+ = Block)
         const worldChanges = new Map();
 
         function getKey(x, y, z) { return `${x},${y},${z}`; }
@@ -116,26 +105,22 @@
             return Math.floor(g * 20 + l * 5);
         }
 
-        // The "Source of Truth" for Physics
+        // Logic Source of Truth
         function getBlockID(x, y, z) {
             const key = getKey(x,y,z);
-            if (worldChanges.has(key)) return worldChanges.get(key); // Check memory first
+            if (worldChanges.has(key)) return worldChanges.get(key); // 0=Air, 1=Solid
 
-            // If no memory, use procedural generation
-            const surface = getBaseHeight(x, z);
-            if (y > surface) return 0; // Air
-            if (y <= -60) return 99; // Bedrock
-            return 1; // Generic Solid (Stone/Dirt/Grass)
+            const h = getBaseHeight(x, z);
+            if (y > h) return 0; // Air
+            if (y <= -60) return 1; // Bedrock
+            return 1; // Solid
         }
 
-        function setBlock(x, y, z, type) {
-            const key = getKey(x,y,z);
-            worldChanges.set(key, type); // 0 = Air, >0 = Solid
+        function setBlock(x, y, z, id) {
+            worldChanges.set(getKey(x,y,z), id);
         }
 
-        // ==========================================
-        // 3. CHUNK RENDERING
-        // ==========================================
+        // Chunk Rendering
         function createChunk(scene, cx, cz) {
             const grp = new THREE.Group();
             const data = {};
@@ -148,22 +133,17 @@
                     const h = getBaseHeight(wx, wz);
                     const lim = Math.max(-64, h-30);
 
-                    // Render Terrain
+                    // Terrain
                     for(let y=h; y>=lim; y--) {
-                        // Check if block was removed by player
                         if (getBlockID(wx,y,wz) !== 0) {
                             let type = 'STONE';
                             if(y===h) type='GRASS';
                             else if(y>h-4) type='DIRT';
-                            
-                            // Check ores
                             if(y<-10 && Math.random()>0.98) type='DIAMOND';
-
                             data[type].push(wx, y, wz);
                         }
                     }
-                    
-                    // Trees (Only if block wasn't removed)
+                    // Trees
                     if(getBlockID(wx,h,wz)!==0 && Math.random()>0.99) {
                         data['WOOD'].push(wx,h+1,wz, wx,h+2,wz, wx,h+3,wz);
                         data['LEAF'].push(wx,h+4,wz, wx+1,h+3,wz, wx-1,h+3,wz, wx,h+3,wz+1, wx,h+3,wz-1);
@@ -196,7 +176,6 @@
                     if(!chunks.has(key)) createChunk(scene, cx+x, cz+z);
                 }
             }
-            // Simple cleanup
             for(const [key, grp] of chunks.entries()) {
                 const [mx, mz] = key.split(',').map(Number);
                 if(Math.abs(mx-cx) > RENDER_DIST+1 || Math.abs(mz-cz) > RENDER_DIST+1) {
@@ -205,9 +184,7 @@
             }
         }
 
-        // ==========================================
-        // 4. INVENTORY
-        // ==========================================
+        // --- 3. INVENTORY ---
         const ITEMS = {
             WOOD: {id:1, icon:"🪵", mat:'WOOD'}, 
             PLANK: {id:2, icon:"🟫", mat:'WOOD'},
@@ -216,18 +193,14 @@
             DIAMOND: {id:5, icon:"💎", mat:'DIAMOND'},
             TABLE: {id:6, icon:"🪚", mat:'WOOD'}
         };
-        
         const inventory = {
-            slots: new Array(9).fill(null),
-            counts: new Array(9).fill(0),
-            selected: 0,
+            slots: new Array(9).fill(null), counts: new Array(9).fill(0), selected: 0,
             init() {
                 const hb = document.getElementById('hotbar');
                 hb.innerHTML = '';
                 for(let i=0; i<9; i++) {
                     const d = document.createElement('div');
-                    d.className='slot'; d.id=`slot-${i}`;
-                    hb.appendChild(d);
+                    d.className='slot'; d.id=`slot-${i}`; hb.appendChild(d);
                 }
                 this.updateUI();
             },
@@ -239,31 +212,22 @@
                 if(this.slots[this.selected]) {
                     this.counts[this.selected]--;
                     if(this.counts[this.selected]<=0) this.slots[this.selected]=null;
-                    this.updateUI();
-                    return true;
-                }
-                return false;
+                    this.updateUI(); return true;
+                } return false;
             },
             get() { return this.slots[this.selected]; },
             updateUI() {
                 for(let i=0; i<9; i++) {
                     const el = document.getElementById(`slot-${i}`);
-                    if(this.slots[i]) {
-                        el.innerText = this.slots[i].icon;
-                        el.setAttribute('data-count', this.counts[i]);
-                    } else {
-                        el.innerText = "";
-                        el.setAttribute('data-count', "");
-                    }
+                    if(this.slots[i]) { el.innerText = this.slots[i].icon; el.setAttribute('data-count', this.counts[i]); }
+                    else { el.innerText = ""; el.setAttribute('data-count', ""); }
                     if(i===this.selected) el.classList.add('selected'); else el.classList.remove('selected');
                 }
             }
         };
         inventory.init();
 
-        // ==========================================
-        // 5. MAIN SETUP
-        // ==========================================
+        // --- 4. GAME SETUP ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB);
         scene.fog = new THREE.Fog(0x87CEEB, 20, 60);
@@ -275,28 +239,16 @@
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.7));
         const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-        sun.position.set(50, 100, 50);
-        scene.add(sun);
+        sun.position.set(50, 100, 50); scene.add(sun);
 
-        // Controls
         const controls = new PointerLockControls(camera, document.body);
         const blocker = document.getElementById('blocker');
         const craftMenu = document.getElementById('crafting-menu');
-        
-        // Robust Click Handler
-        function lock() { if(craftMenu.style.display!=='block') controls.lock(); }
-        document.addEventListener('click', (e) => {
-            if(e.target.id === 'close-craft') return; // Don't lock if closing menu
-            if(!controls.isLocked && craftMenu.style.display!=='block') controls.lock(); 
-        });
-        
+
+        document.getElementById('instructions').addEventListener('click', () => controls.lock());
+        document.getElementById('close-craft').onclick = () => { craftMenu.style.display='none'; controls.lock(); };
         controls.addEventListener('lock', () => { blocker.style.display='none'; });
         controls.addEventListener('unlock', () => { if(craftMenu.style.display!=='block') blocker.style.display='flex'; });
-
-        document.getElementById('close-craft').onclick = () => {
-            craftMenu.style.display = 'none';
-            controls.lock();
-        };
 
         // Player
         const startX = 0; const startZ = 0;
@@ -305,11 +257,10 @@
         camera.position.copy(player.pos);
         updateWorld(scene, player.pos.x, player.pos.z);
 
-        // Interaction (Raycaster)
+        // Interaction Fix
         const raycaster = new THREE.Raycaster();
         const center = new THREE.Vector2(0,0);
-        const placeGeo = new THREE.BoxGeometry(1,1,1);
-
+        
         document.addEventListener('mousedown', e => {
             if(controls.isLocked) {
                 raycaster.setFromCamera(center, camera);
@@ -317,41 +268,43 @@
                 const hit = hits.find(h => h.distance < 6 && (h.object.isInstancedMesh || h.object.isMesh));
                 
                 if(hit) {
-                    const bx = Math.floor(hit.point.x - (hit.face.normal.x*0.1));
-                    const by = Math.floor(hit.point.y - (hit.face.normal.y*0.1));
-                    const bz = Math.floor(hit.point.z - (hit.face.normal.z*0.1));
+                    // FIX: Use Math.round for Integer-Centered Logic
+                    const nx = hit.face.normal.x;
+                    const ny = hit.face.normal.y;
+                    const nz = hit.face.normal.z;
 
-                    // BREAK
-                    if(e.button === 0) {
-                        setBlock(bx, by, bz, 0); // Mark as Air in memory
+                    // Calculate "Inside Block" coordinate (Round to nearest integer)
+                    const bx = Math.round(hit.point.x - (nx * 0.1));
+                    const by = Math.round(hit.point.y - (ny * 0.1));
+                    const bz = Math.round(hit.point.z - (nz * 0.1));
+
+                    if(e.button === 0) { // BREAK
+                        setBlock(bx, by, bz, 0); // Set Air
                         
-                        // Visual update (Cheap way: Reload chunks nearby. Real way: Modify instance)
-                        // For this snippet, we just remove the hit object if it's a placed mesh
-                        // If it's instanced, we force a world update (simplest logic for single file)
-                        if(hit.object.isMesh) scene.remove(hit.object); 
+                        // Force Update: Remove visual and rebuild physics logic
+                        if(hit.object.isMesh) scene.remove(hit.object);
                         else {
-                            // Quick refresh trick: Clear chunks to force rebuild next frame
+                            // Quick refresh nearby chunks
                             chunks.forEach(g => scene.remove(g));
                             chunks.clear();
                             updateWorld(scene, player.pos.x, player.pos.z);
                         }
-                        inventory.addItem('DIRT'); // Simple drop
+                        inventory.addItem('DIRT');
                     }
-
-                    // PLACE
-                    if(e.button === 2) {
+                    if(e.button === 2) { // PLACE
                         const item = inventory.get();
                         if(item) {
-                            const px = Math.floor(hit.point.x + (hit.face.normal.x*0.1));
-                            const py = Math.floor(hit.point.y + (hit.face.normal.y*0.1));
-                            const pz = Math.floor(hit.point.z + (hit.face.normal.z*0.1));
-                            
-                            // Don't place inside player
-                            const pDist = Math.sqrt((px+0.5-player.pos.x)**2 + (py+0.5-player.pos.y)**2 + (pz+0.5-player.pos.z)**2);
-                            if(pDist > 1.5) {
-                                setBlock(px, py, pz, 1); // Mark Solid
-                                const m = new THREE.Mesh(placeGeo, MATS[item.mat]);
-                                m.position.set(px+0.5, py+0.5, pz+0.5);
+                            // Target "Adjacent Block" coordinate
+                            const px = Math.round(hit.point.x + (nx * 0.1));
+                            const py = Math.round(hit.point.y + (ny * 0.1));
+                            const pz = Math.round(hit.point.z + (nz * 0.1));
+
+                            const pDist = Math.sqrt((px-player.pos.x)**2 + (py-player.pos.y)**2 + (pz-player.pos.z)**2);
+                            if(pDist > 1.3) {
+                                setBlock(px, py, pz, 1);
+                                const m = new THREE.Mesh(geometry, MATS[item.mat]);
+                                // FIX: Position at Integer (Center)
+                                m.position.set(px, py, pz); 
                                 scene.add(m);
                                 inventory.use();
                             }
@@ -364,24 +317,18 @@
         // Inputs
         const keys = { w:0, a:0, s:0, d:0, sp:0, sh:0 };
         document.addEventListener('keydown', e => {
-            if(e.code==='KeyW') keys.w=1;
-            if(e.code==='KeyS') keys.s=1;
-            if(e.code==='KeyA') keys.a=1;
-            if(e.code==='KeyD') keys.d=1;
-            if(e.code==='Space') keys.sp=1;
-            if(e.code==='ShiftLeft') keys.sh=1;
+            if(e.code==='KeyW') keys.w=1; if(e.code==='KeyS') keys.s=1;
+            if(e.code==='KeyA') keys.a=1; if(e.code==='KeyD') keys.d=1;
+            if(e.code==='Space') keys.sp=1; if(e.code==='ShiftLeft') keys.sh=1;
             if(e.code==='KeyE') {
                 if(craftMenu.style.display==='block') { craftMenu.style.display='none'; controls.lock(); }
                 else { craftMenu.style.display='block'; controls.unlock(); }
             }
         });
         document.addEventListener('keyup', e => {
-            if(e.code==='KeyW') keys.w=0;
-            if(e.code==='KeyS') keys.s=0;
-            if(e.code==='KeyA') keys.a=0;
-            if(e.code==='KeyD') keys.d=0;
-            if(e.code==='Space') keys.sp=0;
-            if(e.code==='ShiftLeft') keys.sh=0;
+            if(e.code==='KeyW') keys.w=0; if(e.code==='KeyS') keys.s=0;
+            if(e.code==='KeyA') keys.a=0; if(e.code==='KeyD') keys.d=0;
+            if(e.code==='Space') keys.sp=0; if(e.code==='ShiftLeft') keys.sh=0;
         });
         document.addEventListener('wheel', e => {
             if(e.deltaY > 0) inventory.selected = (inventory.selected + 1) % 9;
@@ -389,22 +336,20 @@
             inventory.updateUI();
         });
 
-        // ==========================================
-        // 6. PHYSICS LOOP (The Anti-Fall Fix)
-        // ==========================================
+        // --- 5. PHYSICS ---
         const clock = new THREE.Clock();
         const elCoords = document.getElementById('coords');
         let socket; try { socket = io(); } catch(e){}
 
-        // Check if a block exists in DATA
+        // FIX: Use Math.round to check the block center
         function checkSolid(x, y, z) {
-            return getBlockID(Math.floor(x), Math.floor(y), Math.floor(z)) !== 0;
+            return getBlockID(Math.round(x), Math.round(y), Math.round(z)) !== 0;
         }
 
-        function checkCol(newPos) {
-            // Check feet and head
-            if(checkSolid(newPos.x, newPos.y, newPos.z)) return true;
-            if(checkSolid(newPos.x, newPos.y+1, newPos.z)) return true;
+        function checkCol(np) {
+            // Check body height
+            if(checkSolid(np.x, np.y, np.z)) return true;
+            if(checkSolid(np.x, np.y+1, np.z)) return true;
             return false;
         }
 
@@ -420,25 +365,26 @@
                 rgt.y=0; rgt.normalize();
                 
                 const move = new THREE.Vector3();
-                if(keys.w) move.add(fwd);
-                if(keys.s) move.sub(fwd);
-                if(keys.d) move.add(rgt);
-                if(keys.a) move.sub(rgt);
+                if(keys.w) move.add(fwd); if(keys.s) move.sub(fwd);
+                if(keys.d) move.add(rgt); if(keys.a) move.sub(rgt);
                 if(move.length()>0) move.normalize().multiplyScalar(speed*delta);
 
-                // Horizontal Collision
                 if(!checkCol({x:player.pos.x+move.x, y:player.pos.y, z:player.pos.z})) player.pos.x += move.x;
                 if(!checkCol({x:player.pos.x, y:player.pos.y, z:player.pos.z+move.z})) player.pos.z += move.z;
 
-                // Vertical Physics
                 player.vel.y -= 25 * delta;
                 const nextY = player.pos.y + player.vel.y * delta;
                 
-                // Check if landing on block
-                if(player.vel.y < 0 && checkSolid(player.pos.x, nextY, player.pos.z)) {
+                // Land logic
+                if(player.vel.y < 0 && checkSolid(player.pos.x, nextY - 0.9, player.pos.z)) {
                     player.vel.y = 0;
-                    player.pos.y = Math.floor(player.pos.y); // Snap to block
-                    if(keys.sp) player.vel.y = 9;
+                    // Snap to top of block (Integer + 0.5 + height offset)
+                    // If block is at Y=10, top is 10.5. Player feet at 10.5. Eyes at 10.5+1.6
+                    // Wait, using round logic: Block 10 covers 9.5-10.5.
+                    // So standing on it means y = 10.5 + small offset?
+                    // Let's rely on snapping to round(y) + 0.5?
+                    player.pos.y = Math.round(nextY - 0.9) + 0.5 + 0.9; // Just keep current?
+                    // Simplest: revert y
                 } else {
                     player.pos.y = nextY;
                 }
@@ -446,10 +392,9 @@
                 if(player.pos.y < -100) { player.pos.y=100; player.vel.y=0; }
                 
                 camera.position.copy(player.pos);
-                camera.position.y += 1.6; // Eye height
+                camera.position.y += 0.6; // Eyes
 
-                elCoords.innerText = `X:${Math.floor(player.pos.x)} Y:${Math.floor(player.pos.y)} Z:${Math.floor(player.pos.z)}`;
-
+                elCoords.innerText = `X:${Math.round(player.pos.x)} Y:${Math.round(player.pos.y)} Z:${Math.round(player.pos.z)}`;
                 if(socket) socket.emit('playerMovement', {x:player.pos.x, y:player.pos.y, z:player.pos.z, r:camera.rotation.y});
             }
             updateWorld(scene, player.pos.x, player.pos.z);

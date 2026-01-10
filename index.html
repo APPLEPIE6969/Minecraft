@@ -95,6 +95,19 @@
             padding: 8px 12px;
             border-radius: 5px;
         }
+
+        #minimap-canvas {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 200px;
+            height: 200px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            z-index: 200;
+            pointer-events: auto;
+        }
         
         #hotbar-container {
             position: absolute;
@@ -268,6 +281,8 @@
         <div id="coords">Initializing...</div>
         <div id="crosshair"></div>
     </div>
+
+    <canvas id="minimap-canvas" width="200" height="200"></canvas>
     
     <div id="crafting-menu">
         <h2>CRAFTING</h2>

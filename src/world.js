@@ -9,6 +9,7 @@ export const RENDER_DISTANCE = 8;
 export const chunks = new Map();
 export const worldData = new Map(); // Stores block data: "x,y,z" -> blockType
 const geometry = new THREE.BoxGeometry(1, 1, 1);
+const SHARED_MATERIALS = new Set(Object.values(MATS));
 
 // Block types matching Minecraft
 export const BLOCKS = {
@@ -127,7 +128,7 @@ export function getBlockType(x, y, z) {
 export function setBlock(x, y, z, blockType) {
     const key = getKey(x, y, z);
     if (blockType === null || blockType === BLOCKS.AIR || blockType === 'AIR') {
-        worldData.delete(key);
+        worldData.set(key, null);
     } else {
         // Normalize block type
         if (typeof blockType === 'string') {
@@ -280,6 +281,28 @@ function createChunk(scene, cx, cz) {
     chunks.set(`${cx},${cz}`, group);
 }
 
+function disposeChunkGroup(group) {
+    group.traverse(obj => {
+        if (obj.isInstancedMesh && typeof obj.dispose === 'function') {
+            obj.dispose();
+            return;
+        }
+        
+        if (obj.geometry && obj.geometry !== geometry && typeof obj.geometry.dispose === 'function') {
+            obj.geometry.dispose();
+        }
+        
+        if (obj.material) {
+            const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+            materials.forEach(mat => {
+                if (mat && !SHARED_MATERIALS.has(mat) && typeof mat.dispose === 'function') {
+                    mat.dispose();
+                }
+            });
+        }
+    });
+}
+
 export function updateWorld(scene, playerPos) {
     const px = Math.floor(playerPos.x / CHUNK_SIZE);
     const pz = Math.floor(playerPos.z / CHUNK_SIZE);
@@ -299,10 +322,7 @@ export function updateWorld(scene, playerPos) {
         const [cx, cz] = key.split(',').map(Number);
         if (Math.abs(cx - px) > RENDER_DISTANCE + 2 || Math.abs(cz - pz) > RENDER_DISTANCE + 2) {
             scene.remove(group);
-            group.traverse(obj => {
-                if (obj.geometry) obj.geometry.dispose();
-                if (obj.material) obj.material.dispose();
-            });
+            disposeChunkGroup(group);
             chunks.delete(key);
         }
     }
@@ -317,30 +337,30 @@ export function rebuildChunk(scene, blockX, blockZ) {
     if (chunks.has(key)) {
         const oldChunk = chunks.get(key);
         scene.remove(oldChunk);
-        oldChunk.traverse(obj => {
-            if (obj.geometry) obj.geometry.dispose();
-            if (obj.material) obj.material.dispose();
-        });
+        disposeChunkGroup(oldChunk);
         chunks.delete(key);
     }
     
     createChunk(scene, cx, cz);
     
     // Also rebuild neighboring chunks for edge blocks
-    for (let dx = -1; dx <= 1; dx++) {
-        for (let dz = -1; dz <= 1; dz++) {
-            if (dx === 0 && dz === 0) continue;
-            const nKey = `${cx + dx},${cz + dz}`;
-            if (chunks.has(nKey)) {
-                const neighbor = chunks.get(nKey);
-                scene.remove(neighbor);
-                neighbor.traverse(obj => {
-                    if (obj.geometry) obj.geometry.dispose();
-                    if (obj.material) obj.material.dispose();
-                });
-                chunks.delete(nKey);
-                createChunk(scene, cx + dx, cz + dz);
-            }
+    const localX = ((blockX % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+    const localZ = ((blockZ % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+
+    const neighborCoords = [];
+    if (localX === 0) neighborCoords.push([cx - 1, cz]);
+    if (localX === CHUNK_SIZE - 1) neighborCoords.push([cx + 1, cz]);
+    if (localZ === 0) neighborCoords.push([cx, cz - 1]);
+    if (localZ === CHUNK_SIZE - 1) neighborCoords.push([cx, cz + 1]);
+
+    for (const [nx, nz] of neighborCoords) {
+        const nKey = `${nx},${nz}`;
+        if (chunks.has(nKey)) {
+            const neighbor = chunks.get(nKey);
+            scene.remove(neighbor);
+            disposeChunkGroup(neighbor);
+            chunks.delete(nKey);
+            createChunk(scene, nx, nz);
         }
     }
 }

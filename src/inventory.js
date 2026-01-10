@@ -93,6 +93,7 @@ export class Inventory {
         if (!item) return false;
         
         const maxStack = item.stackSize || 64;
+        const requested = count;
         
         // First try to stack in hotbar
         for (let i = 0; i < 9; i++) {
@@ -149,7 +150,7 @@ export class Inventory {
         }
         
         this.updateUI();
-        return count < count; // Return true if at least some items were added
+        return count < requested; // Return true if at least some items were added
     }
 
     useItem(count = 1) {

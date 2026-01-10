@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-import { updateWorld, rebuildChunk, setBlock, getBlock, isSolid, getSurfaceHeight, CHUNK_SIZE } from './world.js';
+import { updateWorld, rebuildChunk, setBlock, getBlock, isSolid, getSurfaceHeight } from './world.js';
 import { Inventory } from './inventory.js';
 import { ITEMS, BLOCK_DROPS, MINING_TIMES } from './items.js';
-import { MATS } from './textures.js';
+import { Minimap } from './minimap.js';
+import { MobController } from './mobs.js';
 
 console.log('Game module loaded successfully');
 
@@ -202,6 +203,17 @@ try {
     throw error; // This is critical, so we should fail
 }
 
+// Initialize minimap and mobs
+let minimap;
+let mobController;
+try {
+    minimap = new Minimap(player);
+    mobController = new MobController(scene);
+    console.log('Minimap and MobController initialized');
+} catch (error) {
+    console.error('Error initializing minimap or mobs:', error);
+}
+
 // Block breaking system
 let miningBlock = null;
 let miningProgress = 0;
@@ -334,6 +346,19 @@ document.addEventListener('keydown', (e) => {
         case 'Digit7': inventory.selectedSlot = 6; inventory.updateUI(); break;
         case 'Digit8': inventory.selectedSlot = 7; inventory.updateUI(); break;
         case 'Digit9': inventory.selectedSlot = 8; inventory.updateUI(); break;
+        // Minimap and mob controls
+        case 'KeyM': 
+            if (minimap) minimap.showGrid = !minimap.showGrid; 
+            console.log('Minimap grid toggled'); 
+            break;
+        case 'KeyG': 
+            if (mobController) {
+                const difficulties = ['peaceful', 'easy', 'normal', 'hard'];
+                const currentIndex = difficulties.indexOf(mobController.difficulty);
+                const nextIndex = (currentIndex + 1) % difficulties.length;
+                mobController.setDifficulty(difficulties[nextIndex]);
+            }
+            break;
     }
 });
 
@@ -381,17 +406,18 @@ document.addEventListener('mousedown', (e) => {
                 const normal = hit.normal;
                 
                 // Calculate the position to place the new block
-                const placeX = placePos.x + Math.round(normal.x);
-                const placeY = placePos.y + Math.round(normal.y);
-                const placeZ = placePos.z + Math.round(normal.z);
+                // Use exact normal direction for precise placement
+                const placeX = Math.floor(placePos.x + normal.x + 0.5);
+                const placeY = Math.floor(placePos.y + normal.y + 0.5);
+                const placeZ = Math.floor(placePos.z + normal.z + 0.5);
                 
-                // Check collision with player
-                const playerMinX = Math.floor(player.pos.x - player.width / 2);
-                const playerMaxX = Math.floor(player.pos.x + player.width / 2);
-                const playerMinY = Math.floor(player.pos.y);
-                const playerMaxY = Math.floor(player.pos.y + player.height);
-                const playerMinZ = Math.floor(player.pos.z - player.width / 2);
-                const playerMaxZ = Math.floor(player.pos.z + player.width / 2);
+                // Check collision with player (expanded bounds)
+                const playerMinX = Math.floor(player.pos.x - player.width / 2) - 1;
+                const playerMaxX = Math.floor(player.pos.x + player.width / 2) + 1;
+                const playerMinY = Math.floor(player.pos.y) - 1;
+                const playerMaxY = Math.floor(player.pos.y + player.height) + 1;
+                const playerMinZ = Math.floor(player.pos.z - player.width / 2) - 1;
+                const playerMaxZ = Math.floor(player.pos.z + player.width / 2) + 1;
                 
                 const inPlayerBounds = 
                     placeX >= playerMinX && placeX <= playerMaxX &&
@@ -422,6 +448,10 @@ document.addEventListener('mousedown', (e) => {
                             type: blockType
                         });
                     }
+                    
+                    console.log(`Placed ${blockType} at (${placeX}, ${placeY}, ${placeZ})`);
+                } else {
+                    console.log('Cannot place block: invalid position');
                 }
             }
         }
@@ -453,7 +483,7 @@ document.addEventListener('wheel', (e) => {
 
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
-// Update mining progress
+// Update mining progress with performance optimization
 function updateMining(delta) {
     if (miningBlock && keys.leftClick) {
         const hit = getBlockAtRay();
@@ -481,17 +511,28 @@ function updateMining(delta) {
                 inventory.addItem(dropKey, 1);
             }
             
-            setBlock(miningBlock.position.x, miningBlock.position.y, miningBlock.position.z, null);
-            rebuildChunk(scene, miningBlock.position.x, miningBlock.position.z);
+            // Remove block from world data first
+            const blockX = Math.floor(miningBlock.position.x);
+            const blockY = Math.floor(miningBlock.position.y);
+            const blockZ = Math.floor(miningBlock.position.z);
+            
+            setBlock(blockX, blockY, blockZ, null);
+            
+            // Throttle chunk rebuilds to prevent FPS drops
+            requestAnimationFrame(() => {
+                rebuildChunk(scene, blockX, blockZ);
+            });
             
             // Send block breaking to server for multiplayer
             if (socket && socket.connected) {
                 socket.emit('blockBreak', {
-                    x: miningBlock.position.x,
-                    y: miningBlock.position.y,
-                    z: miningBlock.position.z
+                    x: blockX,
+                    y: blockY,
+                    z: blockZ
                 });
             }
+            
+            console.log(`Broke ${blockType} at (${blockX}, ${blockY}, ${blockZ})`);
             
             miningBlock = null;
             miningProgress = 0;
@@ -614,6 +655,7 @@ if (!coordsEl) {
     document.body.appendChild(coordsEl);
 }
 let lastUpdate = 0;
+let worldUpdateTimer = 0;
 
 // Animation loop
 const clock = new THREE.Clock();
@@ -661,6 +703,33 @@ try {
         group.userData.isPlayer = true;
         return group;
     }
+
+    function disposeObject3D(root) {
+        const geometries = new Set();
+        const materials = new Set();
+        const textures = new Set();
+
+        root.traverse(obj => {
+            if (obj.geometry) geometries.add(obj.geometry);
+            if (obj.material) {
+                const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                mats.forEach(m => { if (m) materials.add(m); });
+            }
+        });
+
+        materials.forEach(mat => {
+            if (mat.map) textures.add(mat.map);
+            if (typeof mat.dispose === 'function') mat.dispose();
+        });
+
+        textures.forEach(tex => {
+            if (tex && typeof tex.dispose === 'function') tex.dispose();
+        });
+
+        geometries.forEach(geo => {
+            if (geo && typeof geo.dispose === 'function') geo.dispose();
+        });
+    }
     
     // Handle multiplayer events
     socket.on('blockPlace', (data) => {
@@ -707,6 +776,7 @@ try {
         console.log('Player disconnected:', playerId);
         if (otherPlayers[playerId]) {
             scene.remove(otherPlayers[playerId]);
+            disposeObject3D(otherPlayers[playerId]);
             delete otherPlayers[playerId];
         }
     });
@@ -723,7 +793,17 @@ function animate() {
         updateDayNight(delta);
         updatePhysics(delta);
         updateMining(delta);
-        updateWorld(scene, player.pos);
+        
+        // Optimize world updates - only update every few frames
+        worldUpdateTimer += delta;
+        if (worldUpdateTimer >= 0.2) {
+            updateWorld(scene, player.pos);
+            worldUpdateTimer = 0;
+        }
+        
+        // Update minimap and mobs
+        if (minimap) minimap.update();
+        if (mobController) mobController.update(delta, player.pos);
         
         // Update UI every 0.1s
         lastUpdate += delta;

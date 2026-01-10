@@ -47,7 +47,7 @@ function getBiome(x, z) {
 
 // Cache for noise values to reduce repeated calculations
 const noiseCache = new Map();
-const MAX_CACHE_SIZE = 10000;
+const MAX_CACHE_SIZE = 5000; // Reduced cache size for memory efficiency
 
 function getCachedNoise(x, z, scale) {
     const key = `${Math.floor(x/scale)},${Math.floor(z/scale)}`;
@@ -228,28 +228,13 @@ function createChunk(scene, cx, cz) {
     
     const treePositions = [];
     
-    // Pre-calculate noise values for the entire chunk to reduce repeated calls
-    const surfaceHeights = new Array(CHUNK_SIZE * CHUNK_SIZE);
-    const biomes = new Array(CHUNK_SIZE * CHUNK_SIZE);
-    
+    // Pre-calculate only what we need - no arrays to save memory
     for (let x = 0; x < CHUNK_SIZE; x++) {
         for (let z = 0; z < CHUNK_SIZE; z++) {
             const wx = cx * CHUNK_SIZE + x;
             const wz = cz * CHUNK_SIZE + z;
-            const idx = x * CHUNK_SIZE + z;
-            
-            surfaceHeights[idx] = getSurfaceHeight(wx, wz);
-            biomes[idx] = getBiome(wx, wz);
-        }
-    }
-    
-    for (let x = 0; x < CHUNK_SIZE; x++) {
-        for (let z = 0; z < CHUNK_SIZE; z++) {
-            const wx = cx * CHUNK_SIZE + x;
-            const wz = cz * CHUNK_SIZE + z;
-            const idx = x * CHUNK_SIZE + z;
-            const surface = surfaceHeights[idx];
-            const biome = biomes[idx];
+            const surface = getSurfaceHeight(wx, wz);
+            const biome = getBiome(wx, wz);
             const depth = Math.max(0, surface - 50);
             
             // Generate terrain
@@ -268,8 +253,6 @@ function createChunk(scene, cx, cz) {
                     else if (blockType === BLOCKS.BEDROCK) matKey = 'BEDROCK';
                     else if (blockType === BLOCKS.STONE) matKey = 'STONE';
                     
-                    // Simplified: Add all blocks (face culling is complex with instanced meshes)
-                    // In a full implementation, we'd use a greedy meshing algorithm
                     chunkData[matKey].push(wx, y, wz);
                 }
                 
@@ -347,20 +330,25 @@ export function updateWorld(scene, playerPos) {
     if (lastPlayerChunk === playerChunkKey) return;
     lastPlayerChunk = playerChunkKey;
     
-    // Load chunks within render distance
+    // Calculate which chunks should be loaded
+    const chunksToLoad = new Set();
     for (let x = -RENDER_DISTANCE; x <= RENDER_DISTANCE; x++) {
         for (let z = -RENDER_DISTANCE; z <= RENDER_DISTANCE; z++) {
-            const key = `${px + x},${pz + z}`;
-            if (!chunks.has(key)) {
-                createChunk(scene, px + x, pz + z);
-            }
+            chunksToLoad.add(`${px + x},${pz + z}`);
         }
     }
     
-    // Unload chunks outside extended render distance
+    // Load new chunks
+    for (const key of chunksToLoad) {
+        if (!chunks.has(key)) {
+            const [cx, cz] = key.split(',').map(Number);
+            createChunk(scene, cx, cz);
+        }
+    }
+    
+    // Unload chunks that are no longer needed
     for (const [key, group] of chunks.entries()) {
-        const [cx, cz] = key.split(',').map(Number);
-        if (Math.abs(cx - px) > RENDER_DISTANCE + 2 || Math.abs(cz - pz) > RENDER_DISTANCE + 2) {
+        if (!chunksToLoad.has(key)) {
             scene.remove(group);
             disposeChunkGroup(group);
             chunks.delete(key);

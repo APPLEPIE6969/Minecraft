@@ -800,7 +800,7 @@ function animate() {
         
         // Optimize world updates - only update every few frames
         worldUpdateTimer += delta;
-        if (worldUpdateTimer >= 1.0) {
+        if (worldUpdateTimer >= 2.0) {
             updateWorld(scene, player.pos);
             worldUpdateTimer = 0;
         }

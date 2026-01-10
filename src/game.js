@@ -96,6 +96,7 @@ const startZ = 0;
 let startY;
 try {
     startY = getSurfaceHeight(startX, startZ) + 2;
+    console.log(`Spawning player at surface height: ${startY}`);
 } catch (error) {
     console.error('Error getting surface height:', error);
     startY = 70; // Default spawn height
@@ -159,23 +160,23 @@ function getBlockAtRay() {
     for (const intersect of intersects) {
         if (intersect.distance > maxReach) continue;
         
+        // Check if this is a block mesh
+        if (!intersect.object.userData || !intersect.object.userData.isBlock) continue;
+        
         const point = intersect.point.clone();
         const normal = intersect.face.normal.clone();
         
-        // Get block position (rounded)
-        const blockPos = new THREE.Vector3(
-            Math.floor(point.x),
-            Math.floor(point.y),
-            Math.floor(point.z)
-        );
-        
-        // Check if we hit a face - adjust for block boundaries
-        if (Math.abs(point.x - blockPos.x - 0.5) < 0.01) {
-            blockPos.x += normal.x > 0 ? 0 : -1;
-        } else if (Math.abs(point.z - blockPos.z - 0.5) < 0.01) {
-            blockPos.z += normal.z > 0 ? 0 : -1;
-        } else if (Math.abs(point.y - blockPos.y - 0.5) < 0.01) {
-            blockPos.y += normal.y > 0 ? 0 : -1;
+        // Get the exact block position from the mesh userData
+        let blockPos;
+        if (intersect.object.userData.blockPosition) {
+            blockPos = intersect.object.userData.blockPosition.clone();
+        } else {
+            // Fallback: calculate from intersection point
+            blockPos = new THREE.Vector3(
+                Math.floor(point.x + (normal.x > 0 ? -0.01 : normal.x < 0 ? 0.01 : 0)),
+                Math.floor(point.y + (normal.y > 0 ? -0.01 : normal.y < 0 ? 0.01 : 0)),
+                Math.floor(point.z + (normal.z > 0 ? -0.01 : normal.z < 0 ? 0.01 : 0))
+            );
         }
         
         const block = getBlock(blockPos.x, blockPos.y, blockPos.z);
@@ -184,7 +185,9 @@ function getBlockAtRay() {
                 block: block,
                 position: blockPos,
                 face: intersect.face,
-                distance: intersect.distance
+                normal: normal,
+                distance: intersect.distance,
+                point: point
             };
         }
     }
@@ -293,12 +296,12 @@ document.addEventListener('mousedown', (e) => {
             if (item && item.placeable) {
                 // Calculate placement position (adjacent to hit face)
                 const placePos = hit.position.clone();
-                const normal = hit.face.normal;
+                const normal = hit.normal;
                 
-                // Check if placement position is valid (not inside player, not solid)
-                const checkX = placePos.x + Math.round(normal.x);
-                const checkY = placePos.y + Math.round(normal.y);
-                const checkZ = placePos.z + Math.round(normal.z);
+                // Calculate the position to place the new block
+                const placeX = placePos.x + Math.round(normal.x);
+                const placeY = placePos.y + Math.round(normal.y);
+                const placeZ = placePos.z + Math.round(normal.z);
                 
                 // Check collision with player
                 const playerMinX = Math.floor(player.pos.x - player.width / 2);
@@ -309,11 +312,11 @@ document.addEventListener('mousedown', (e) => {
                 const playerMaxZ = Math.floor(player.pos.z + player.width / 2);
                 
                 const inPlayerBounds = 
-                    checkX >= playerMinX && checkX <= playerMaxX &&
-                    checkY >= playerMinY && checkY <= playerMaxY &&
-                    checkZ >= playerMinZ && checkZ <= playerMaxZ;
+                    placeX >= playerMinX && placeX <= playerMaxX &&
+                    placeY >= playerMinY && placeY <= playerMaxY &&
+                    placeZ >= playerMinZ && placeZ <= playerMaxZ;
                 
-                if (!inPlayerBounds && !isSolid(checkX, checkY, checkZ)) {
+                if (!inPlayerBounds && !isSolid(placeX, placeY, placeZ)) {
                     // Convert item mat to block type
                     let blockType = item.mat;
                     // Map material keys to block types
@@ -324,9 +327,19 @@ document.addEventListener('mousedown', (e) => {
                     else if (blockType === 'LEAF') blockType = 'LEAVES';
                     else blockType = 'DIRT'; // Default
                     
-                    setBlock(checkX, checkY, checkZ, blockType);
-                    rebuildChunk(scene, checkX, checkZ);
+                    setBlock(placeX, placeY, placeZ, blockType);
+                    rebuildChunk(scene, placeX, placeZ);
                     inventory.useItem(1);
+                    
+                    // Send block placement to server for multiplayer
+                    if (socket && socket.connected) {
+                        socket.emit('blockPlace', {
+                            x: placeX,
+                            y: placeY,
+                            z: placeZ,
+                            type: blockType
+                        });
+                    }
                 }
             }
         }
@@ -389,6 +402,15 @@ function updateMining(delta) {
             setBlock(miningBlock.position.x, miningBlock.position.y, miningBlock.position.z, null);
             rebuildChunk(scene, miningBlock.position.x, miningBlock.position.z);
             
+            // Send block breaking to server for multiplayer
+            if (socket && socket.connected) {
+                socket.emit('blockBreak', {
+                    x: miningBlock.position.x,
+                    y: miningBlock.position.y,
+                    z: miningBlock.position.z
+                });
+            }
+            
             miningBlock = null;
             miningProgress = 0;
             miningIndicator.style.display = 'none';
@@ -418,16 +440,35 @@ function updatePhysics(delta) {
     
     if (direction.length() > 0) {
         direction.normalize();
-        direction.applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, camera.rotation.y, 0)));
         
-        const move = direction.multiplyScalar(moveSpeed * delta);
+        // Get camera direction for movement
+        const cameraDirection = new THREE.Vector3();
+        camera.getWorldDirection(cameraDirection);
+        cameraDirection.y = 0; // Keep movement on horizontal plane
+        cameraDirection.normalize();
         
-        // Horizontal collision
-        if (!checkCollision(player.pos.x + move.x, player.pos.y, player.pos.z)) {
-            player.pos.x += move.x;
-        }
-        if (!checkCollision(player.pos.x, player.pos.y, player.pos.z + move.z)) {
-            player.pos.z += move.z;
+        // Create right vector for strafing
+        const rightVector = new THREE.Vector3();
+        rightVector.crossVectors(cameraDirection, new THREE.Vector3(0, 1, 0));
+        
+        // Calculate movement direction based on input
+        const moveDirection = new THREE.Vector3();
+        if (keys.w) moveDirection.add(cameraDirection);
+        if (keys.s) moveDirection.sub(cameraDirection);
+        if (keys.a) moveDirection.sub(rightVector);
+        if (keys.d) moveDirection.add(rightVector);
+        
+        if (moveDirection.length() > 0) {
+            moveDirection.normalize();
+            const move = moveDirection.multiplyScalar(moveSpeed * delta);
+            
+            // Horizontal collision
+            if (!checkCollision(player.pos.x + move.x, player.pos.y, player.pos.z)) {
+                player.pos.x += move.x;
+            }
+            if (!checkCollision(player.pos.x, player.pos.y, player.pos.z + move.z)) {
+                player.pos.z += move.z;
+            }
         }
     }
     
@@ -497,6 +538,39 @@ const clock = new THREE.Clock();
 let socket;
 try { 
     socket = io(); 
+    
+    // Handle multiplayer events
+    socket.on('blockPlace', (data) => {
+        setBlock(data.x, data.y, data.z, data.type);
+        rebuildChunk(scene, data.x, data.z);
+    });
+    
+    socket.on('blockBreak', (data) => {
+        setBlock(data.x, data.y, data.z, null);
+        rebuildChunk(scene, data.x, data.z);
+    });
+    
+    socket.on('currentPlayers', (players) => {
+        // Handle existing players when joining
+        Object.keys(players).forEach(id => {
+            if (id !== socket.id) {
+                console.log('Existing player:', id, players[id]);
+            }
+        });
+    });
+    
+    socket.on('newPlayer', (data) => {
+        console.log('New player joined:', data.id);
+    });
+    
+    socket.on('playerMoved', (data) => {
+        // Update other player positions (you could render other players here)
+    });
+    
+    socket.on('playerDisconnected', (playerId) => {
+        console.log('Player disconnected:', playerId);
+    });
+    
 } catch(e) {
     console.log('Socket.IO not available, continuing without multiplayer');
 }

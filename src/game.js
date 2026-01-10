@@ -237,24 +237,29 @@ function getBlockAtRay() {
     for (const intersect of intersects) {
         if (intersect.distance > maxReach) continue;
         
-        // Check if this is a block mesh
-        if (!intersect.object.userData || !intersect.object.userData.isBlock) continue;
+        // Check if this is a block mesh (instanced or regular)
+        let isBlockMesh = false;
+        let object = intersect.object;
+        
+        // Traverse up to find the actual mesh with userData
+        while (object && !object.userData) {
+            object = object.parent;
+        }
+        
+        if (object && object.userData && object.userData.isBlock) {
+            isBlockMesh = true;
+        }
+        
+        if (!isBlockMesh) continue;
         
         const point = intersect.point.clone();
-        const normal = intersect.face.normal.clone();
         
-        // Get the exact block position from the mesh userData
-        let blockPos;
-        if (intersect.object.userData.blockPosition) {
-            blockPos = intersect.object.userData.blockPosition.clone();
-        } else {
-            // Fallback: calculate from intersection point
-            blockPos = new THREE.Vector3(
-                Math.floor(point.x + (normal.x > 0 ? -0.01 : normal.x < 0 ? 0.01 : 0)),
-                Math.floor(point.y + (normal.y > 0 ? -0.01 : normal.y < 0 ? 0.01 : 0)),
-                Math.floor(point.z + (normal.z > 0 ? -0.01 : normal.z < 0 ? 0.01 : 0))
-            );
-        }
+        // Get block position from intersection point
+        const blockPos = new THREE.Vector3(
+            Math.floor(point.x + (intersect.face.normal.x > 0 ? -0.01 : intersect.face.normal.x < 0 ? 0.01 : 0)),
+            Math.floor(point.y + (intersect.face.normal.y > 0 ? -0.01 : intersect.face.normal.y < 0 ? 0.01 : 0)),
+            Math.floor(point.z + (intersect.face.normal.z > 0 ? -0.01 : intersect.face.normal.z < 0 ? 0.01 : 0))
+        );
         
         const block = getBlock(blockPos.x, blockPos.y, blockPos.z);
         if (block) {
@@ -262,7 +267,7 @@ function getBlockAtRay() {
                 block: block,
                 position: blockPos,
                 face: intersect.face,
-                normal: normal,
+                normal: intersect.face.normal,
                 distance: intersect.distance,
                 point: point
             };
@@ -616,6 +621,47 @@ let socket;
 try { 
     socket = io(); 
     
+    // Store other players' models
+    const otherPlayers = {};
+    
+    // Create player model function
+    function createPlayerModel(id, color = 0xff0000) {
+        const group = new THREE.Group();
+        
+        // Body
+        const bodyGeometry = new THREE.BoxGeometry(0.6, 1.8, 0.6);
+        const bodyMaterial = new THREE.MeshLambertMaterial({ color: color });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.position.y = 0.9;
+        group.add(body);
+        
+        // Head
+        const headGeometry = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+        const headMaterial = new THREE.MeshLambertMaterial({ color: 0xffdbac });
+        const head = new THREE.Mesh(headGeometry, headMaterial);
+        head.position.y = 2.1;
+        group.add(head);
+        
+        // Name tag
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'white';
+        ctx.font = '24px Arial';
+        ctx.fillText(id.substring(0, 8), 10, 40);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        sprite.position.y = 2.8;
+        sprite.scale.set(2, 0.5, 1);
+        group.add(sprite);
+        
+        group.userData.isPlayer = true;
+        return group;
+    }
+    
     // Handle multiplayer events
     socket.on('blockPlace', (data) => {
         setBlock(data.x, data.y, data.z, data.type);
@@ -630,22 +676,39 @@ try {
     socket.on('currentPlayers', (players) => {
         // Handle existing players when joining
         Object.keys(players).forEach(id => {
-            if (id !== socket.id) {
-                console.log('Existing player:', id, players[id]);
+            if (id !== socket.id && !otherPlayers[id]) {
+                const playerModel = createPlayerModel(id, 0x00ff00);
+                playerModel.position.set(players[id].x, players[id].y, players[id].z);
+                scene.add(playerModel);
+                otherPlayers[id] = playerModel;
             }
         });
     });
     
     socket.on('newPlayer', (data) => {
         console.log('New player joined:', data.id);
+        if (data.id !== socket.id && !otherPlayers[data.id]) {
+            const playerModel = createPlayerModel(data.id, 0x0000ff);
+            playerModel.position.set(data.player.x, data.player.y, data.player.z);
+            scene.add(playerModel);
+            otherPlayers[data.id] = playerModel;
+        }
     });
     
     socket.on('playerMoved', (data) => {
-        // Update other player positions (you could render other players here)
+        // Update other player positions
+        if (otherPlayers[data.id]) {
+            otherPlayers[data.id].position.set(data.pos.x, data.pos.y, data.pos.z);
+            otherPlayers[data.id].rotation.y = data.pos.r;
+        }
     });
     
     socket.on('playerDisconnected', (playerId) => {
         console.log('Player disconnected:', playerId);
+        if (otherPlayers[playerId]) {
+            scene.remove(otherPlayers[playerId]);
+            delete otherPlayers[playerId];
+        }
     });
     
 } catch(e) {

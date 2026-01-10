@@ -259,6 +259,10 @@ function createChunk(scene, cx, cz) {
         const mesh = new THREE.InstancedMesh(geometry, MATS[matKey], instanceCount);
         const tempObject = new THREE.Object3D();
         
+        // Add userData for raycasting detection
+        mesh.userData.isBlock = true;
+        mesh.userData.materialType = matKey;
+        
         for (let i = 0; i < instanceCount; i++) {
             const px = positions[i * 3];
             const py = positions[i * 3 + 1];

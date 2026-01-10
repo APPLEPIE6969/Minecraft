@@ -6,6 +6,16 @@ const noise2D = createNoise2D();
 
 export const CHUNK_SIZE = 16;
 export let RENDER_DISTANCE = 4; // Make configurable
+
+// Update function to sync with window.RENDER_DISTANCE
+function syncRenderDistance() {
+    if (window.RENDER_DISTANCE !== undefined) {
+        RENDER_DISTANCE = window.RENDER_DISTANCE;
+    }
+}
+
+// Call this function periodically or when needed
+setInterval(syncRenderDistance, 100);
 export const chunks = new Map();
 export const worldData = new Map(); // Stores block data: "x,y,z" -> blockType
 let lastPlayerChunk = null; // Track player's last chunk position

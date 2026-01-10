@@ -6,6 +6,9 @@ import { ITEMS, BLOCK_DROPS, MINING_TIMES } from './items.js';
 import { Minimap } from './minimap.js';
 import { MobController } from './mobs.js';
 
+// Make RENDER_DISTANCE globally accessible for options menu
+window.RENDER_DISTANCE = RENDER_DISTANCE;
+
 console.log('Game module loaded successfully');
 
 // Scene setup
@@ -883,6 +886,7 @@ if (renderDistanceSlider && renderDistanceValue) {
         renderDistanceValue.textContent = value;
         // Update render distance in world.js
         window.RENDER_DISTANCE = value;
+        console.log('Render distance updated to:', value);
     });
 }
 

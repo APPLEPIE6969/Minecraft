@@ -2,412 +2,283 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft Fixed</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft - Like Game</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: monospace; user-select: none; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
-        #blocker { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; display: flex; align-items: center; justify-content: center; }
-        #instructions { color: white; font-size: 24px; text-align: center; cursor: pointer; background: rgba(0,0,0,0.8); padding: 30px; border: 2px solid white; border-radius: 8px; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #87CEEB;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            cursor: none;
+        }
         
-        #hud { position: absolute; width: 100%; height: 100%; pointer-events: none; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='); border: 2px solid rgba(255,255,255,0.8); transform: translate(-50%, -50%); border-radius: 50%; }
-        #coords { position: absolute; top: 10px; left: 10px; color: white; font-weight: bold; text-shadow: 1px 1px 0 #000; font-size: 18px; }
-
-        #hotbar-container { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 5px; pointer-events: auto; }
-        #hotbar { display: flex; gap: 4px; background: rgba(0,0,0,0.6); padding: 6px; border-radius: 5px; }
-        .slot { width: 48px; height: 48px; border: 2px solid #555; background: rgba(0,0,0,0.4); color: white; display: flex; align-items: center; justify-content: center; font-size: 24px; position: relative; }
-        .slot::after { content: attr(data-count); position: absolute; bottom: 2px; right: 2px; font-size: 12px; font-weight: bold; }
-        .selected { border-color: white; background: rgba(255,255,255,0.2); transform: scale(1.1); box-shadow: 0 0 10px white; }
-
-        #crafting-menu { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; background: #222; color: white; border: 2px solid #888; padding: 20px; z-index: 500; pointer-events: auto; }
-        .recipe-btn { padding: 8px; margin: 5px 0; background: #444; border: 1px solid #666; cursor: pointer; display: flex; justify-content: space-between; }
-        .recipe-btn:hover { background: #555; }
+        #blocker {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #instructions {
+            color: white;
+            font-size: 24px;
+            text-align: center;
+            cursor: pointer;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border: 3px solid white;
+            border-radius: 10px;
+            max-width: 600px;
+        }
+        
+        #instructions h1 {
+            margin-bottom: 20px;
+            font-size: 36px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+        
+        #instructions p {
+            margin: 10px 0;
+            font-size: 18px;
+            line-height: 1.6;
+        }
+        
+        #hud {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 2px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+        }
+        
+        #crosshair::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.9);
+            transform: translate(-50%, -50%);
+        }
+        
+        #coords {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            font-size: 16px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 12px;
+            border-radius: 5px;
+        }
+        
+        #hotbar-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            pointer-events: auto;
+        }
+        
+        #hotbar {
+            display: flex;
+            gap: 4px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px;
+            border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .slot {
+            width: 54px;
+            height: 54px;
+            border: 2px solid #555;
+            background: rgba(60, 60, 60, 0.8);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            position: relative;
+            border-radius: 4px;
+            transition: all 0.1s;
+        }
+        
+        .slot::after {
+            content: attr(data-count);
+            position: absolute;
+            bottom: 4px;
+            right: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }
+        
+        .slot.selected {
+            border-color: white;
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        }
+        
+        #crafting-menu {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 350px;
+            max-height: 70vh;
+            background: rgba(30, 30, 30, 0.95);
+            color: white;
+            border: 3px solid #888;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 500;
+            pointer-events: auto;
+            overflow-y: auto;
+        }
+        
+        #crafting-menu h2 {
+            text-align: center;
+            margin-bottom: 15px;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+        
+        #crafting-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .recipe-btn {
+            padding: 12px;
+            margin: 5px 0;
+            background: rgba(60, 60, 60, 0.8);
+            border: 2px solid #666;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 5px;
+            transition: all 0.2s;
+        }
+        
+        .recipe-btn:hover {
+            background: rgba(80, 80, 80, 0.9);
+            border-color: #888;
+        }
+        
+        .recipe-btn:active {
+            transform: scale(0.98);
+        }
+        
+        #close-craft {
+            width: 100%;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(100, 100, 100, 0.8);
+            border: 2px solid #666;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 5px;
+            transition: all 0.2s;
+        }
+        
+        #close-craft:hover {
+            background: rgba(120, 120, 120, 0.9);
+        }
+        
+        .inv-slot {
+            position: relative;
+        }
+        
+        .inv-slot::after {
+            content: attr(data-count);
+            position: absolute;
+            bottom: 2px;
+            right: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }
     </style>
     
     <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
     <script type="importmap">
-        { "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-            "simplex-noise": "https://unpkg.com/simplex-noise@4.0.1/dist/esm/simplex-noise.js"
-        }}
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "simplex-noise": "https://unpkg.com/simplex-noise@4.0.1/dist/esm/simplex-noise.js"
+            }
+        }
     </script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 <body>
     <div id="blocker">
         <div id="instructions">
-            <h1>CLICK TO START</h1>
-            <p>WASD = Move | SPACE = Jump</p>
-            <p>Left Click = Mine | Right Click = Build</p>
-            <p>E = Inventory | Scroll = Select</p>
+            <h1>MINECRAFT-LIKE GAME</h1>
+            <p><strong>WASD</strong> - Move</p>
+            <p><strong>SPACE</strong> - Jump</p>
+            <p><strong>SHIFT</strong> - Sprint</p>
+            <p><strong>CTRL</strong> - Sneak</p>
+            <p><strong>Left Click</strong> - Break Block</p>
+            <p><strong>Right Click</strong> - Place Block</p>
+            <p><strong>E</strong> - Inventory/Crafting</p>
+            <p><strong>1-9</strong> - Select Hotbar Slot</p>
+            <p><strong>Scroll</strong> - Switch Item</p>
+            <p style="margin-top: 20px; font-size: 14px; color: #aaa;">Click anywhere to start</p>
         </div>
     </div>
 
     <div id="hud">
-        <div id="coords">Init...</div>
+        <div id="coords">Initializing...</div>
         <div id="crosshair"></div>
     </div>
     
     <div id="crafting-menu">
-        <h2 style="text-align:center; margin-top:0;">CRAFTING</h2>
+        <h2>CRAFTING</h2>
         <div id="crafting-list"></div>
-        <button id="close-craft" style="width:100%; margin-top:10px; padding:8px;">Close</button>
+        <button id="close-craft">Close (E)</button>
     </div>
 
     <div id="hotbar-container">
         <div id="hotbar"></div>
     </div>
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-        import { createNoise2D } from 'simplex-noise';
-
-        // --- 1. TEXTURES ---
-        function createTexture(color) {
-            const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = color; ctx.fillRect(0,0,64,64);
-            for(let i=0; i<300; i++) {
-                ctx.fillStyle = Math.random()>0.5?'rgba(255,255,255,0.15)':'rgba(0,0,0,0.15)';
-                ctx.fillRect(Math.random()*64, Math.random()*64, 4, 4);
-            }
-            const tex = new THREE.CanvasTexture(canvas);
-            tex.magFilter = THREE.NearestFilter;
-            tex.colorSpace = THREE.SRGBColorSpace;
-            return tex;
-        }
-
-        const MATS = {
-            GRASS: new THREE.MeshLambertMaterial({ map: createTexture('#567d46') }),
-            DIRT:  new THREE.MeshLambertMaterial({ map: createTexture('#8B4513') }),
-            STONE: new THREE.MeshLambertMaterial({ map: createTexture('#757575') }),
-            WOOD:  new THREE.MeshLambertMaterial({ map: createTexture('#5C4033') }),
-            LEAF:  new THREE.MeshLambertMaterial({ map: createTexture('#228B22') }),
-            DIAMOND: new THREE.MeshLambertMaterial({ map: createTexture('#00FFFF') }),
-            BEDROCK: new THREE.MeshLambertMaterial({ map: createTexture('#111') })
-        };
-
-        // --- 2. WORLD & MATH FIX ---
-        const noise2D = createNoise2D();
-        const CHUNK_SIZE = 16;
-        const RENDER_DIST = 3;
-        const geometry = new THREE.BoxGeometry(1, 1, 1);
-        const chunks = new Map();
-        const worldChanges = new Map();
-
-        function getKey(x, y, z) { return `${x},${y},${z}`; }
-
-        function getBaseHeight(x, z) {
-            const g = noise2D(x/60, z/60);
-            const l = noise2D(x/20, z/20);
-            return Math.floor(g * 20 + l * 5);
-        }
-
-        // Logic Source of Truth
-        function getBlockID(x, y, z) {
-            const key = getKey(x,y,z);
-            if (worldChanges.has(key)) return worldChanges.get(key); // 0=Air, 1=Solid
-
-            const h = getBaseHeight(x, z);
-            if (y > h) return 0; // Air
-            if (y <= -60) return 1; // Bedrock
-            return 1; // Solid
-        }
-
-        function setBlock(x, y, z, id) {
-            worldChanges.set(getKey(x,y,z), id);
-        }
-
-        // Chunk Rendering
-        function createChunk(scene, cx, cz) {
-            const grp = new THREE.Group();
-            const data = {};
-            Object.keys(MATS).forEach(k => data[k] = []);
-
-            for(let x=0; x<CHUNK_SIZE; x++) {
-                for(let z=0; z<CHUNK_SIZE; z++) {
-                    const wx = cx*CHUNK_SIZE+x;
-                    const wz = cz*CHUNK_SIZE+z;
-                    const h = getBaseHeight(wx, wz);
-                    const lim = Math.max(-64, h-30);
-
-                    // Terrain
-                    for(let y=h; y>=lim; y--) {
-                        if (getBlockID(wx,y,wz) !== 0) {
-                            let type = 'STONE';
-                            if(y===h) type='GRASS';
-                            else if(y>h-4) type='DIRT';
-                            if(y<-10 && Math.random()>0.98) type='DIAMOND';
-                            data[type].push(wx, y, wz);
-                        }
-                    }
-                    // Trees
-                    if(getBlockID(wx,h,wz)!==0 && Math.random()>0.99) {
-                        data['WOOD'].push(wx,h+1,wz, wx,h+2,wz, wx,h+3,wz);
-                        data['LEAF'].push(wx,h+4,wz, wx+1,h+3,wz, wx-1,h+3,wz, wx,h+3,wz+1, wx,h+3,wz-1);
-                    }
-                }
-            }
-
-            Object.keys(data).forEach(t => {
-                const arr = data[t];
-                if(arr.length===0) return;
-                const m = new THREE.InstancedMesh(geometry, MATS[t], arr.length/3);
-                const o = new THREE.Object3D();
-                for(let i=0; i<arr.length/3; i++) {
-                    o.position.set(arr[i*3], arr[i*3+1], arr[i*3+2]);
-                    o.updateMatrix();
-                    m.setMatrixAt(i, o.matrix);
-                }
-                grp.add(m);
-            });
-            scene.add(grp);
-            chunks.set(`${cx},${cz}`, grp);
-        }
-
-        function updateWorld(scene, px, pz) {
-            const cx = Math.floor(px / CHUNK_SIZE);
-            const cz = Math.floor(pz / CHUNK_SIZE);
-            for(let x=-RENDER_DIST; x<=RENDER_DIST; x++) {
-                for(let z=-RENDER_DIST; z<=RENDER_DIST; z++) {
-                    const key = `${cx+x},${cz+z}`;
-                    if(!chunks.has(key)) createChunk(scene, cx+x, cz+z);
-                }
-            }
-            for(const [key, grp] of chunks.entries()) {
-                const [mx, mz] = key.split(',').map(Number);
-                if(Math.abs(mx-cx) > RENDER_DIST+1 || Math.abs(mz-cz) > RENDER_DIST+1) {
-                    scene.remove(grp); chunks.delete(key);
-                }
-            }
-        }
-
-        // --- 3. INVENTORY ---
-        const ITEMS = {
-            WOOD: {id:1, icon:"🪵", mat:'WOOD'}, 
-            PLANK: {id:2, icon:"🟫", mat:'WOOD'},
-            STONE: {id:3, icon:"⬜", mat:'STONE'},
-            DIRT: {id:4, icon:"🟫", mat:'DIRT'},
-            DIAMOND: {id:5, icon:"💎", mat:'DIAMOND'},
-            TABLE: {id:6, icon:"🪚", mat:'WOOD'}
-        };
-        const inventory = {
-            slots: new Array(9).fill(null), counts: new Array(9).fill(0), selected: 0,
-            init() {
-                const hb = document.getElementById('hotbar');
-                hb.innerHTML = '';
-                for(let i=0; i<9; i++) {
-                    const d = document.createElement('div');
-                    d.className='slot'; d.id=`slot-${i}`; hb.appendChild(d);
-                }
-                this.updateUI();
-            },
-            addItem(k, c=1) {
-                for(let i=0; i<9; i++) if(this.slots[i]===ITEMS[k]) { this.counts[i]+=c; this.updateUI(); return; }
-                for(let i=0; i<9; i++) if(this.slots[i]===null) { this.slots[i]=ITEMS[k]; this.counts[i]=c; this.updateUI(); return; }
-            },
-            use() {
-                if(this.slots[this.selected]) {
-                    this.counts[this.selected]--;
-                    if(this.counts[this.selected]<=0) this.slots[this.selected]=null;
-                    this.updateUI(); return true;
-                } return false;
-            },
-            get() { return this.slots[this.selected]; },
-            updateUI() {
-                for(let i=0; i<9; i++) {
-                    const el = document.getElementById(`slot-${i}`);
-                    if(this.slots[i]) { el.innerText = this.slots[i].icon; el.setAttribute('data-count', this.counts[i]); }
-                    else { el.innerText = ""; el.setAttribute('data-count', ""); }
-                    if(i===this.selected) el.classList.add('selected'); else el.classList.remove('selected');
-                }
-            }
-        };
-        inventory.init();
-
-        // --- 4. GAME SETUP ---
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB);
-        scene.fog = new THREE.Fog(0x87CEEB, 20, 60);
-
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: false });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
-
-        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-        const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-        sun.position.set(50, 100, 50); scene.add(sun);
-
-        const controls = new PointerLockControls(camera, document.body);
-        const blocker = document.getElementById('blocker');
-        const craftMenu = document.getElementById('crafting-menu');
-
-        document.getElementById('instructions').addEventListener('click', () => controls.lock());
-        document.getElementById('close-craft').onclick = () => { craftMenu.style.display='none'; controls.lock(); };
-        controls.addEventListener('lock', () => { blocker.style.display='none'; });
-        controls.addEventListener('unlock', () => { if(craftMenu.style.display!=='block') blocker.style.display='flex'; });
-
-        // Player
-        const startX = 0; const startZ = 0;
-        let ground = getBaseHeight(startX, startZ);
-        const player = { pos: new THREE.Vector3(startX, ground+10, startZ), vel: new THREE.Vector3() };
-        camera.position.copy(player.pos);
-        updateWorld(scene, player.pos.x, player.pos.z);
-
-        // Interaction Fix
-        const raycaster = new THREE.Raycaster();
-        const center = new THREE.Vector2(0,0);
-        
-        document.addEventListener('mousedown', e => {
-            if(controls.isLocked) {
-                raycaster.setFromCamera(center, camera);
-                const hits = raycaster.intersectObjects(scene.children, true);
-                const hit = hits.find(h => h.distance < 6 && (h.object.isInstancedMesh || h.object.isMesh));
-                
-                if(hit) {
-                    // FIX: Use Math.round for Integer-Centered Logic
-                    const nx = hit.face.normal.x;
-                    const ny = hit.face.normal.y;
-                    const nz = hit.face.normal.z;
-
-                    // Calculate "Inside Block" coordinate (Round to nearest integer)
-                    const bx = Math.round(hit.point.x - (nx * 0.1));
-                    const by = Math.round(hit.point.y - (ny * 0.1));
-                    const bz = Math.round(hit.point.z - (nz * 0.1));
-
-                    if(e.button === 0) { // BREAK
-                        setBlock(bx, by, bz, 0); // Set Air
-                        
-                        // Force Update: Remove visual and rebuild physics logic
-                        if(hit.object.isMesh) scene.remove(hit.object);
-                        else {
-                            // Quick refresh nearby chunks
-                            chunks.forEach(g => scene.remove(g));
-                            chunks.clear();
-                            updateWorld(scene, player.pos.x, player.pos.z);
-                        }
-                        inventory.addItem('DIRT');
-                    }
-                    if(e.button === 2) { // PLACE
-                        const item = inventory.get();
-                        if(item) {
-                            // Target "Adjacent Block" coordinate
-                            const px = Math.round(hit.point.x + (nx * 0.1));
-                            const py = Math.round(hit.point.y + (ny * 0.1));
-                            const pz = Math.round(hit.point.z + (nz * 0.1));
-
-                            const pDist = Math.sqrt((px-player.pos.x)**2 + (py-player.pos.y)**2 + (pz-player.pos.z)**2);
-                            if(pDist > 1.3) {
-                                setBlock(px, py, pz, 1);
-                                const m = new THREE.Mesh(geometry, MATS[item.mat]);
-                                // FIX: Position at Integer (Center)
-                                m.position.set(px, py, pz); 
-                                scene.add(m);
-                                inventory.use();
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        // Inputs
-        const keys = { w:0, a:0, s:0, d:0, sp:0, sh:0 };
-        document.addEventListener('keydown', e => {
-            if(e.code==='KeyW') keys.w=1; if(e.code==='KeyS') keys.s=1;
-            if(e.code==='KeyA') keys.a=1; if(e.code==='KeyD') keys.d=1;
-            if(e.code==='Space') keys.sp=1; if(e.code==='ShiftLeft') keys.sh=1;
-            if(e.code==='KeyE') {
-                if(craftMenu.style.display==='block') { craftMenu.style.display='none'; controls.lock(); }
-                else { craftMenu.style.display='block'; controls.unlock(); }
-            }
-        });
-        document.addEventListener('keyup', e => {
-            if(e.code==='KeyW') keys.w=0; if(e.code==='KeyS') keys.s=0;
-            if(e.code==='KeyA') keys.a=0; if(e.code==='KeyD') keys.d=0;
-            if(e.code==='Space') keys.sp=0; if(e.code==='ShiftLeft') keys.sh=0;
-        });
-        document.addEventListener('wheel', e => {
-            if(e.deltaY > 0) inventory.selected = (inventory.selected + 1) % 9;
-            else inventory.selected = (inventory.selected - 1 + 9) % 9;
-            inventory.updateUI();
-        });
-
-        // --- 5. PHYSICS ---
-        const clock = new THREE.Clock();
-        const elCoords = document.getElementById('coords');
-        let socket; try { socket = io(); } catch(e){}
-
-        // FIX: Use Math.round to check the block center
-        function checkSolid(x, y, z) {
-            return getBlockID(Math.round(x), Math.round(y), Math.round(z)) !== 0;
-        }
-
-        function checkCol(np) {
-            // Check body height
-            if(checkSolid(np.x, np.y, np.z)) return true;
-            if(checkSolid(np.x, np.y+1, np.z)) return true;
-            return false;
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = Math.min(clock.getDelta(), 0.1);
-
-            if(controls.isLocked) {
-                const speed = keys.sh ? 10 : 5;
-                const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-                fwd.y=0; fwd.normalize();
-                const rgt = new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
-                rgt.y=0; rgt.normalize();
-                
-                const move = new THREE.Vector3();
-                if(keys.w) move.add(fwd); if(keys.s) move.sub(fwd);
-                if(keys.d) move.add(rgt); if(keys.a) move.sub(rgt);
-                if(move.length()>0) move.normalize().multiplyScalar(speed*delta);
-
-                if(!checkCol({x:player.pos.x+move.x, y:player.pos.y, z:player.pos.z})) player.pos.x += move.x;
-                if(!checkCol({x:player.pos.x, y:player.pos.y, z:player.pos.z+move.z})) player.pos.z += move.z;
-
-                player.vel.y -= 25 * delta;
-                const nextY = player.pos.y + player.vel.y * delta;
-                
-                // Land logic
-                if(player.vel.y < 0 && checkSolid(player.pos.x, nextY - 0.9, player.pos.z)) {
-                    player.vel.y = 0;
-                    // Snap to top of block (Integer + 0.5 + height offset)
-                    // If block is at Y=10, top is 10.5. Player feet at 10.5. Eyes at 10.5+1.6
-                    // Wait, using round logic: Block 10 covers 9.5-10.5.
-                    // So standing on it means y = 10.5 + small offset?
-                    // Let's rely on snapping to round(y) + 0.5?
-                    player.pos.y = Math.round(nextY - 0.9) + 0.5 + 0.9; // Just keep current?
-                    // Simplest: revert y
-                } else {
-                    player.pos.y = nextY;
-                }
-
-                if(player.pos.y < -100) { player.pos.y=100; player.vel.y=0; }
-                
-                camera.position.copy(player.pos);
-                camera.position.y += 0.6; // Eyes
-
-                elCoords.innerText = `X:${Math.round(player.pos.x)} Y:${Math.round(player.pos.y)} Z:${Math.round(player.pos.z)}`;
-                if(socket) socket.emit('playerMovement', {x:player.pos.x, y:player.pos.y, z:player.pos.z, r:camera.rotation.y});
-            }
-            updateWorld(scene, player.pos.x, player.pos.z);
-            renderer.render(scene, camera);
-        }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        animate();
-    </script>
+    <script type="module" src="src/game.js"></script>
 </body>
 </html>

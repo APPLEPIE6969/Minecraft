@@ -152,6 +152,13 @@ if (instructions) {
     console.warn('Instructions element not found');
 }
 
+// Also add click event to blocker div as fallback
+if (blocker) {
+    blocker.addEventListener('click', () => {
+        controls.lock();
+    });
+}
+
 controls.addEventListener('lock', () => {
     if (blocker) blocker.style.display = 'none';
 });

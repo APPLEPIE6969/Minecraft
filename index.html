@@ -398,6 +398,11 @@
         <div id="hotbar"></div>
     </div>
 
-    <script type="module" src="src/game.js"></script>
+    <script type="module">
+    // Wait for DOM to be ready before loading the game
+    document.addEventListener('DOMContentLoaded', () => {
+        import('./src/game.js');
+    });
+</script>
 </body>
 </html>

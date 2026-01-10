@@ -5,7 +5,7 @@ import { MATS } from './textures.js';
 const noise2D = createNoise2D();
 
 export const CHUNK_SIZE = 16;
-export const RENDER_DISTANCE = 4;
+export let RENDER_DISTANCE = 4; // Make configurable
 export const chunks = new Map();
 export const worldData = new Map(); // Stores block data: "x,y,z" -> blockType
 let lastPlayerChunk = null; // Track player's last chunk position

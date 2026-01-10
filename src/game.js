@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-import { updateWorld, rebuildChunk, setBlock, getBlock, isSolid, getSurfaceHeight } from './world.js';
+import { updateWorld, rebuildChunk, setBlock, getBlock, isSolid, getSurfaceHeight, RENDER_DISTANCE } from './world.js';
 import { Inventory } from './inventory.js';
 import { ITEMS, BLOCK_DROPS, MINING_TIMES } from './items.js';
 import { Minimap } from './minimap.js';
@@ -300,7 +300,10 @@ function checkCollision(x, y, z) {
 }
 
 // Input handling
-const keys = {
+const keys = {};
+let lastWTap = 0;
+let sprinting = false;
+const keyBindings = {
     w: false, a: false, s: false, d: false,
     space: false, shift: false, ctrl: false,
     leftClick: false, rightClick: false
@@ -308,7 +311,16 @@ const keys = {
 
 document.addEventListener('keydown', (e) => {
     switch(e.code) {
-        case 'KeyW': keys.w = true; break;
+        case 'KeyW': 
+            keys.w = true;
+            // Double-tap W for sprint
+            const now = Date.now();
+            if (now - lastWTap < 300) { // 300ms window for double-tap
+                sprinting = true;
+                setTimeout(() => sprinting = false, 3000); // Sprint for 3 seconds
+            }
+            lastWTap = now;
+            break;
         case 'KeyS': keys.s = true; break;
         case 'KeyA': keys.a = true; break;
         case 'KeyD': keys.d = true; break;
@@ -326,6 +338,10 @@ document.addEventListener('keydown', (e) => {
                 inventory.toggle();
                 controls.lock();
             }
+            break;
+        case 'KeyO':
+            e.preventDefault();
+            toggleOptionsMenu();
             break;
         case 'Digit1': inventory.selectedSlot = 0; inventory.updateUI(); break;
         case 'Digit2': inventory.selectedSlot = 1; inventory.updateUI(); break;
@@ -540,8 +556,8 @@ function updatePhysics(delta) {
     if (!controls.isLocked) return;
     
     // Movement
-    player.sprinting = keys.shift && !keys.ctrl;
-    player.sneaking = keys.ctrl;
+    player.sprinting = sprinting;
+    player.sneaking = keys.ctrl; // Changed from shift to ctrl
     
     const moveSpeed = player.sneaking ? 1.0 : (player.sprinting ? 5.6 : 4.3); // Minecraft speeds
     
@@ -830,6 +846,39 @@ window.addEventListener('resize', () => {
     renderer.setSize(newResolution.width, newResolution.height);
     renderer.setPixelRatio(newResolution.pixelRatio);
 });
+
+// Options menu functionality
+function toggleOptionsMenu() {
+    const optionsMenu = document.getElementById('options-menu');
+    const isOpen = optionsMenu && optionsMenu.style.display !== 'none' && optionsMenu.style.display !== '';
+    
+    if (isOpen) {
+        optionsMenu.style.display = 'none';
+        controls.lock();
+    } else {
+        optionsMenu.style.display = 'block';
+        controls.unlock();
+    }
+}
+
+// Render distance slider
+const renderDistanceSlider = document.getElementById('render-distance');
+const renderDistanceValue = document.getElementById('render-distance-value');
+
+if (renderDistanceSlider && renderDistanceValue) {
+    renderDistanceSlider.addEventListener('input', (e) => {
+        const value = parseInt(e.target.value);
+        renderDistanceValue.textContent = value;
+        // Update render distance in world.js
+        window.RENDER_DISTANCE = value;
+    });
+}
+
+// Close options menu button
+const closeOptionsBtn = document.getElementById('close-options');
+if (closeOptionsBtn) {
+    closeOptionsBtn.addEventListener('click', toggleOptionsMenu);
+}
 
 // Close crafting menu button
 const closeCraftBtn = document.getElementById('close-craft');

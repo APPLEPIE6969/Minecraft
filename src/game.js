@@ -5,6 +5,8 @@ import { Inventory } from './inventory.js';
 import { ITEMS, BLOCK_DROPS, MINING_TIMES } from './items.js';
 import { MATS } from './textures.js';
 
+console.log('Game module loaded successfully');
+
 // Scene setup
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -72,22 +74,32 @@ const controls = new PointerLockControls(camera, document.body);
 const blocker = document.getElementById('blocker');
 const instructions = document.getElementById('instructions');
 
-instructions.addEventListener('click', () => {
-    controls.lock();
-});
+if (instructions) {
+    instructions.addEventListener('click', () => {
+        controls.lock();
+    });
+} else {
+    console.warn('Instructions element not found');
+}
 
 controls.addEventListener('lock', () => {
-    blocker.style.display = 'none';
+    if (blocker) blocker.style.display = 'none';
 });
 
 controls.addEventListener('unlock', () => {
-    blocker.style.display = 'flex';
+    if (blocker) blocker.style.display = 'flex';
 });
 
 // Player setup
 const startX = 0;
 const startZ = 0;
-const startY = getSurfaceHeight(startX, startZ) + 2;
+let startY;
+try {
+    startY = getSurfaceHeight(startX, startZ) + 2;
+} catch (error) {
+    console.error('Error getting surface height:', error);
+    startY = 70; // Default spawn height
+}
 
 const player = {
     pos: new THREE.Vector3(startX, startY, startZ),
@@ -104,7 +116,13 @@ camera.position.copy(player.pos);
 camera.position.y += player.eyeHeight;
 
 // Inventory
-const inventory = new Inventory();
+let inventory;
+try {
+    inventory = new Inventory();
+} catch (error) {
+    console.error('Error initializing inventory:', error);
+    throw error; // This is critical, so we should fail
+}
 
 // Block breaking system
 let miningBlock = null;
@@ -459,41 +477,65 @@ function updatePhysics(delta) {
     }
 }
 
-// UI updates
-const coordsEl = document.getElementById('coords');
+// UI updates - ensure element exists
+let coordsEl = document.getElementById('coords');
+if (!coordsEl) {
+    console.warn('Coords element not found!');
+    // Create a fallback element
+    coordsEl = document.createElement('div');
+    coordsEl.id = 'coords';
+    coordsEl.style.position = 'absolute';
+    coordsEl.style.top = '10px';
+    coordsEl.style.left = '10px';
+    coordsEl.style.color = 'white';
+    document.body.appendChild(coordsEl);
+}
 let lastUpdate = 0;
 
 // Animation loop
 const clock = new THREE.Clock();
 let socket;
-try { socket = io(); } catch(e) {}
+try { 
+    socket = io(); 
+} catch(e) {
+    console.log('Socket.IO not available, continuing without multiplayer');
+}
 
 function animate() {
     requestAnimationFrame(animate);
     const delta = Math.min(clock.getDelta(), 0.1);
     
-    updateDayNight(delta);
-    updatePhysics(delta);
-    updateMining(delta);
-    updateWorld(scene, player.pos);
-    
-    // Update UI every 0.1s
-    lastUpdate += delta;
-    if (lastUpdate > 0.1) {
-        coordsEl.textContent = `X: ${Math.floor(player.pos.x)} Y: ${Math.floor(player.pos.y)} Z: ${Math.floor(player.pos.z)} | FPS: ${Math.round(1/delta)}`;
-        lastUpdate = 0;
+    try {
+        updateDayNight(delta);
+        updatePhysics(delta);
+        updateMining(delta);
+        updateWorld(scene, player.pos);
         
-        if (socket) {
-            socket.emit('playerMovement', {
-                x: player.pos.x,
-                y: player.pos.y,
-                z: player.pos.z,
-                r: camera.rotation.y
-            });
+        // Update UI every 0.1s
+        lastUpdate += delta;
+        if (lastUpdate > 0.1) {
+            if (coordsEl) {
+                coordsEl.textContent = `X: ${Math.floor(player.pos.x)} Y: ${Math.floor(player.pos.y)} Z: ${Math.floor(player.pos.z)} | FPS: ${Math.round(1/delta)}`;
+            }
+            lastUpdate = 0;
+            
+            if (socket && socket.connected) {
+                socket.emit('playerMovement', {
+                    x: player.pos.x,
+                    y: player.pos.y,
+                    z: player.pos.z,
+                    r: camera.rotation.y
+                });
+            }
+        }
+        
+        renderer.render(scene, camera);
+    } catch (error) {
+        console.error('Animation error:', error);
+        if (coordsEl) {
+            coordsEl.textContent = `Error: ${error.message}`;
         }
     }
-    
-    renderer.render(scene, camera);
 }
 
 // Window resize
@@ -512,7 +554,25 @@ if (closeCraftBtn) {
     });
 }
 
-// Initialize world
-updateWorld(scene, player.pos);
-
-animate();
+// Initialize world and start game
+console.log('Starting game initialization...');
+try {
+    console.log('Initializing world...');
+    updateWorld(scene, player.pos);
+    console.log('World initialized successfully');
+    console.log('Starting animation loop...');
+    animate();
+    if (coordsEl) {
+        coordsEl.textContent = `X: ${Math.floor(player.pos.x)} Y: ${Math.floor(player.pos.y)} Z: ${Math.floor(player.pos.z)}`;
+    }
+    console.log('Game started successfully!');
+} catch (error) {
+    console.error('Initialization error:', error);
+    console.error('Stack:', error.stack);
+    if (coordsEl) {
+        coordsEl.textContent = `Error: ${error.message}`;
+        coordsEl.style.color = 'red';
+    }
+    // Show error in console and on screen
+    alert(`Game failed to initialize:\n${error.message}\n\nCheck browser console for details.`);
+}

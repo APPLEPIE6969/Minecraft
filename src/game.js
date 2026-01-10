@@ -912,25 +912,34 @@ if (closeCraftBtn) {
     });
 }
 
-// Initialize world and start game
-console.log('Starting game initialization...');
-try {
-    console.log('Initializing world...');
-    updateWorld(scene, player.pos);
-    console.log('World initialized successfully');
-    console.log('Starting animation loop...');
-    animate();
-    if (coordsEl) {
-        coordsEl.textContent = `X: ${Math.floor(player.pos.x)} Y: ${Math.floor(player.pos.y)} Z: ${Math.floor(player.pos.z)}`;
+// Initialize game when DOM is ready
+function initGame() {
+    console.log('Starting game initialization...');
+    try {
+        console.log('Initializing world...');
+        updateWorld(scene, player.pos);
+        console.log('World initialized successfully');
+        console.log('Starting animation loop...');
+        animate();
+        if (coordsEl) {
+            coordsEl.textContent = `X: ${Math.floor(player.pos.x)} Y: ${Math.floor(player.pos.y)} Z: ${Math.floor(player.pos.z)}`;
+        }
+        console.log('Game started successfully!');
+    } catch (error) {
+        console.error('Initialization error:', error);
+        console.error('Stack:', error.stack);
+        if (coordsEl) {
+            coordsEl.textContent = `Error: ${error.message}`;
+            coordsEl.style.color = 'red';
+        }
+        // Show error in console and on screen
+        alert(`Game failed to initialize:\n${error.message}\n\nCheck browser console for details.`);
     }
-    console.log('Game started successfully!');
-} catch (error) {
-    console.error('Initialization error:', error);
-    console.error('Stack:', error.stack);
-    if (coordsEl) {
-        coordsEl.textContent = `Error: ${error.message}`;
-        coordsEl.style.color = 'red';
-    }
-    // Show error in console and on screen
-    alert(`Game failed to initialize:\n${error.message}\n\nCheck browser console for details.`);
+}
+
+// Start the game when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGame);
+} else {
+    initGame();
 }

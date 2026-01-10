@@ -68,6 +68,11 @@ scene.add(sun);
 
 // Simple day/night cycle (no complex lighting)
 let timeOfDay = 0.5; // 0 = midnight, 0.5 = noon, 1 = midnight
+const dayFog = new THREE.Fog(0x87CEEB, 50, 200);
+const nightFog = new THREE.Fog(0x000022, 20, 100);
+const dayBackground = new THREE.Color(0x87CEEB);
+const nightBackground = new THREE.Color(0x000022);
+
 function updateDayNight(delta) {
     timeOfDay += delta / 120; // 2 minute day cycle
     if (timeOfDay > 1) timeOfDay -= 1;
@@ -79,20 +84,20 @@ function updateDayNight(delta) {
         // Daytime
         ambientLight.intensity = 0.6;
         sun.intensity = 0.8;
-        scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
-        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = dayFog;
+        scene.background = dayBackground;
     } else {
         // Nighttime
         ambientLight.intensity = 0.2;
         sun.intensity = 0.1;
-        scene.fog = new THREE.Fog(0x000022, 20, 100);
-        scene.background = new THREE.Color(0x000022);
+        scene.fog = nightFog;
+        scene.background = nightBackground;
     }
 }
 
 // Sky gradient
-scene.background = new THREE.Color(0x87CEEB);
-scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
+scene.background = dayBackground;
+scene.fog = dayFog;
 
 // Controls
 const controls = new PointerLockControls(camera, document.body);

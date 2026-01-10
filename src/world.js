@@ -8,6 +8,7 @@ export const CHUNK_SIZE = 16;
 export const RENDER_DISTANCE = 4;
 export const chunks = new Map();
 export const worldData = new Map(); // Stores block data: "x,y,z" -> blockType
+let lastPlayerChunk = null; // Track player's last chunk position
 const geometry = new THREE.BoxGeometry(1, 1, 1);
 const SHARED_MATERIALS = new Set(Object.values(MATS));
 
@@ -35,8 +36,8 @@ function getKey(x, y, z) {
 
 // Minecraft-like terrain generation
 function getBiome(x, z) {
-    const temp = noise2D(x / 200, z / 200);
-    const humidity = noise2D((x + 1000) / 200, (z + 1000) / 200);
+    const temp = getCachedNoise(x, z, 200);
+    const humidity = getCachedNoise(x + 1000, z + 1000, 200);
     
     if (temp < -0.3) return 'SNOW'; // Tundra
     if (temp > 0.3 && humidity < -0.2) return 'DESERT';
@@ -44,14 +45,32 @@ function getBiome(x, z) {
     return 'PLAINS';
 }
 
+// Cache for noise values to reduce repeated calculations
+const noiseCache = new Map();
+const MAX_CACHE_SIZE = 10000;
+
+function getCachedNoise(x, z, scale) {
+    const key = `${Math.floor(x/scale)},${Math.floor(z/scale)}`;
+    if (noiseCache.has(key)) return noiseCache.get(key);
+    
+    const value = noise2D(x / scale, z / scale);
+    if (noiseCache.size > MAX_CACHE_SIZE) {
+        // Clear oldest entries (simple LRU)
+        const firstKey = noiseCache.keys().next().value;
+        noiseCache.delete(firstKey);
+    }
+    noiseCache.set(key, value);
+    return value;
+}
+
 export function getSurfaceHeight(x, z) {
     const biome = getBiome(x, z);
     let height = 64;
     
-    // Base terrain height
-    const global = noise2D(x / 200, z / 200);
-    const local = noise2D(x / 50, z / 50);
-    const detail = noise2D(x / 20, z / 20) * 0.3;
+    // Use cached noise for better performance
+    const global = getCachedNoise(x, z, 200);
+    const local = getCachedNoise(x, z, 50);
+    const detail = getCachedNoise(x, z, 20) * 0.3;
     
     height = 64 + Math.floor(global * 30 + local * 10 + detail * 5);
     
@@ -62,9 +81,9 @@ export function getSurfaceHeight(x, z) {
 }
 
 function getCaveNoise(x, y, z) {
-    const cave1 = noise2D(x / 30, y / 30 + z / 30);
-    const cave2 = noise2D(x / 50 + 1000, z / 50 + y / 50);
-    const cave3 = noise2D(y / 25, x / 25 + z / 25 + 2000);
+    const cave1 = getCachedNoise(x, y + z, 30);
+    const cave2 = getCachedNoise(x + 1000, z + y, 50);
+    const cave3 = getCachedNoise(y, x + z + 2000, 25);
     return (cave1 + cave2 + cave3) / 3;
 }
 
@@ -209,12 +228,28 @@ function createChunk(scene, cx, cz) {
     
     const treePositions = [];
     
+    // Pre-calculate noise values for the entire chunk to reduce repeated calls
+    const surfaceHeights = new Array(CHUNK_SIZE * CHUNK_SIZE);
+    const biomes = new Array(CHUNK_SIZE * CHUNK_SIZE);
+    
     for (let x = 0; x < CHUNK_SIZE; x++) {
         for (let z = 0; z < CHUNK_SIZE; z++) {
             const wx = cx * CHUNK_SIZE + x;
             const wz = cz * CHUNK_SIZE + z;
-            const surface = getSurfaceHeight(wx, wz);
-            const biome = getBiome(wx, wz);
+            const idx = x * CHUNK_SIZE + z;
+            
+            surfaceHeights[idx] = getSurfaceHeight(wx, wz);
+            biomes[idx] = getBiome(wx, wz);
+        }
+    }
+    
+    for (let x = 0; x < CHUNK_SIZE; x++) {
+        for (let z = 0; z < CHUNK_SIZE; z++) {
+            const wx = cx * CHUNK_SIZE + x;
+            const wz = cz * CHUNK_SIZE + z;
+            const idx = x * CHUNK_SIZE + z;
+            const surface = surfaceHeights[idx];
+            const biome = biomes[idx];
             const depth = Math.max(0, surface - 50);
             
             // Generate terrain
@@ -306,6 +341,11 @@ function disposeChunkGroup(group) {
 export function updateWorld(scene, playerPos) {
     const px = Math.floor(playerPos.x / CHUNK_SIZE);
     const pz = Math.floor(playerPos.z / CHUNK_SIZE);
+    
+    // Only check for chunks to load/unload if player moved significantly
+    const playerChunkKey = `${px},${pz}`;
+    if (lastPlayerChunk === playerChunkKey) return;
+    lastPlayerChunk = playerChunkKey;
     
     // Load chunks within render distance
     for (let x = -RENDER_DISTANCE; x <= RENDER_DISTANCE; x++) {

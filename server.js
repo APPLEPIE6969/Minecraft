@@ -7,7 +7,8 @@ const io = new Server(server, {
     cors: {
         origin: "*",
         methods: ["GET", "POST"]
-    }
+    },
+    transports: ['websocket', 'polling'] // Fallback to polling if WebSocket fails
 });
 
 // 1. Serve the Game File

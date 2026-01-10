@@ -9,3 +9,5 @@ services:
       - key: NODE_ENV
         value: production
     healthCheckPath: /
+    # Enable WebSocket support for Socket.IO
+    allowDeployOnPush: true

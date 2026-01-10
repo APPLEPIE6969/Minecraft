@@ -800,14 +800,14 @@ function animate() {
         
         // Optimize world updates - only update every few frames
         worldUpdateTimer += delta;
-        if (worldUpdateTimer >= 0.5) {
+        if (worldUpdateTimer >= 1.0) {
             updateWorld(scene, player.pos);
             worldUpdateTimer = 0;
         }
         
         // Update minimap and mobs (throttled)
         minimapUpdateTimer += delta;
-        if (minimapUpdateTimer >= 0.2) {
+        if (minimapUpdateTimer >= 0.5) {
             if (minimap) minimap.update();
             minimapUpdateTimer = 0;
         }

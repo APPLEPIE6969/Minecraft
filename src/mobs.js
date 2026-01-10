@@ -354,9 +354,9 @@ export class MobController {
     getMaxMobs() {
         switch(this.difficulty) {
             case 'peaceful': return 0;
-            case 'easy': return 8;
-            case 'normal': return 12;
-            case 'hard': return 20;
+            case 'easy': return 4;
+            case 'normal': return 6;
+            case 'hard': return 10;
             default: return 25;
         }
     }
@@ -496,7 +496,7 @@ export class MobController {
         const distToPlayer = pos.distanceTo(playerPos);
         
         // Skip AI for distant mobs (LOD)
-        if (distToPlayer > 64) return;
+        if (distToPlayer > 32) return;
         
         // State machine
         switch (data.state) {
@@ -770,7 +770,7 @@ export class MobController {
         this.spawnTimer += delta;
         
         // Spawn based on difficulty and time
-        if (this.spawnTimer > 10 && this.mobs.length < this.maxMobs) {
+        if (this.spawnTimer > 15 && this.mobs.length < this.maxMobs) {
             const mobTypes = Object.keys(MOB_TYPES).filter(type => {
                 const mobData = MOB_TYPES[type];
                 return Math.random() < mobData.spawnWeight / 100;

@@ -11,7 +11,7 @@ export class Minimap {
         }
         this.ctx = this.canvas.getContext('2d');
         this.size = 150; // Map radius
-        this.zoom = 1.5; // Pixels per block
+        this.zoom = 1.0; // Pixels per block
         
         // Minimap settings
         this.showGrid = true;
@@ -154,7 +154,7 @@ export class Minimap {
                 ctx.fillRect(screenX, screenY, size, size);
                 
                 // Add texture details
-                if (this.zoom > 1.5) {
+                if (this.zoom > 1.0) {
                     ctx.fillStyle = `rgba(0, 0, 0, 0.1)`;
                     ctx.fillRect(screenX, screenY, size, size);
                 }

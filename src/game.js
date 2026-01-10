@@ -759,7 +759,7 @@ function animate() {
         
         // Update minimap and mobs (throttled)
         minimapUpdateTimer += delta;
-        if (minimapUpdateTimer >= 0.5) {
+        if (minimapUpdateTimer >= 1.0) {
             if (minimap) minimap.update();
             minimapUpdateTimer = 0;
         }

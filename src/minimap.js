@@ -292,6 +292,13 @@ export class Minimap {
         const playerX = Math.floor(this.player.pos.x);
         const playerZ = Math.floor(this.player.pos.z);
         
+        // Check if player moved significantly
+        const playerKey = `${Math.floor(playerX / 10)},${Math.floor(playerZ / 10)}`;
+        const needsUpdate = Math.abs(this.lastUpdatePos.x - playerX) > 2 || 
+                          Math.abs(this.lastUpdatePos.z - playerZ) > 2;
+        
+        if (!needsUpdate) return; // Skip update if player hasn't moved much
+        
         // Clear with gradient background
         const bgGradient = ctx.createRadialGradient(
             width / 2, height / 2, 0,
@@ -314,5 +321,7 @@ export class Minimap {
         ctx.font = 'bold 12px monospace';
         ctx.fillText(`X: ${playerX} Z: ${playerZ}`, 5, height - 5);
         ctx.fillText(`Zoom: ${this.zoom.toFixed(1)}x`, 5, 15);
+        
+        this.lastUpdatePos = { x: playerX, z: playerZ };
     }
 }

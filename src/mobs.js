@@ -743,19 +743,21 @@ export class MobController {
         const playerChunkX = Math.floor(playerPos.x / CHUNK_SIZE);
         const playerChunkZ = Math.floor(playerPos.z / CHUNK_SIZE);
         
-        // Update all mobs
-        for (const mob of [...this.mobs]) {
-            if (this.mobs.indexOf(mob) === -1) continue;
-            
-            // Skip mobs not in loaded chunks
-            const mobChunkX = Math.floor(mob.position.x / CHUNK_SIZE);
-            const mobChunkZ = Math.floor(mob.position.z / CHUNK_SIZE);
-            if (Math.abs(mobChunkX - playerChunkX) > RENDER_DISTANCE || 
-                Math.abs(mobChunkZ - playerChunkZ) > RENDER_DISTANCE) {
-                continue;
+        // Update all mobs (throttled to every other frame)
+        if (Math.random() < 0.5) { // 50% chance per frame
+            for (const mob of [...this.mobs]) {
+                if (this.mobs.indexOf(mob) === -1) continue;
+                
+                // Skip mobs not in loaded chunks
+                const mobChunkX = Math.floor(mob.position.x / CHUNK_SIZE);
+                const mobChunkZ = Math.floor(mob.position.z / CHUNK_SIZE);
+                if (Math.abs(mobChunkX - playerChunkX) > RENDER_DISTANCE || 
+                    Math.abs(mobChunkZ - playerChunkZ) > RENDER_DISTANCE) {
+                    continue;
+                }
+                
+                this.updateMobAI(mob, delta, playerPos);
             }
-            
-            this.updateMobAI(mob, delta, playerPos);
         }
         
         // Clean up dead mobs

@@ -310,27 +310,31 @@ const keyBindings = {
 };
 
 document.addEventListener('keydown', (e) => {
-    switch(e.code) {
-        case 'KeyW': 
-            keys.w = true;
-            // Double-tap W for sprint
-            const now = Date.now();
-            if (now - lastWTap < 300) { // 300ms window for double-tap
-                sprinting = true;
-                setTimeout(() => sprinting = false, 3000); // Sprint for 3 seconds
-            }
-            lastWTap = now;
-            break;
-        case 'KeyS': keys.s = true; break;
-        case 'KeyA': keys.a = true; break;
-        case 'KeyD': keys.d = true; break;
-        case 'Space': keys.space = true; e.preventDefault(); break;
-        case 'ShiftLeft': keys.shift = true; break;
-        case 'ControlLeft': keys.ctrl = true; break;
-        case 'KeyE': 
-            e.preventDefault();
-            const container = document.getElementById('inventory-container');
-            const isOpen = container && container.style.display !== 'none' && container.style.display !== '';
+switch(e.code) {
+case 'KeyW': 
+keys.w = true;
+// Sprint when holding W
+if (keys.shift) {
+sprinting = true;
+}
+break;
+case 'KeyS': keys.s = true; break;
+case 'KeyA': keys.a = true; break;
+case 'KeyD': keys.d = true; break;
+case 'Space': keys.space = true; e.preventDefault(); break;
+case 'ShiftLeft': 
+keys.shift = true;
+// Start sprinting if W is also held
+if (keys.w) {
+sprinting = true;
+}
+break;
+case 'ControlLeft': keys.ctrl = true; break;
+case 'KeyE': 
+e.preventDefault();
+const container = document.getElementById('inventory-container');
+const isOpen = container && container.style.display !== 'none' && container.style.display !== '';
+// ... rest of the code remains the same ...
             if (!isOpen) {
                 inventory.toggle();
                 controls.unlock();
@@ -370,13 +374,21 @@ document.addEventListener('keydown', (e) => {
 
 document.addEventListener('keyup', (e) => {
     switch(e.code) {
-        case 'KeyW': keys.w = false; break;
+        case 'KeyW': 
+            keys.w = false;
+            // Stop sprinting when W is released
+            sprinting = false;
+            break;
         case 'KeyS': keys.s = false; break;
         case 'KeyA': keys.a = false; break;
         case 'KeyD': keys.d = false; break;
         case 'Space': keys.space = false; break;
-        case 'ShiftLeft': keys.shift = false; break;
-        case 'ControlLeft': keys.ctrl = false; break;
+        case 'ShiftLeft': 
+            keys.shift = false;
+            // Stop sprinting when Shift is released
+            sprinting = false;
+            break;
+        case 'ControlLeft': keys.ctrl = true; break;
     }
 });
 
@@ -557,7 +569,7 @@ function updatePhysics(delta) {
     
     // Movement
     player.sprinting = sprinting;
-    player.sneaking = keys.ctrl; // Changed from shift to ctrl
+    player.sneaking = keys.shift; // Changed back to shift for sneak
     
     const moveSpeed = player.sneaking ? 1.0 : (player.sprinting ? 5.6 : 4.3); // Minecraft speeds
     

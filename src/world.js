@@ -236,11 +236,11 @@ function createChunk(scene, cx, cz) {
                     // In a full implementation, we'd use a greedy meshing algorithm
                     chunkData[matKey].push(wx, y, wz);
                 }
-            }
-            
-            // Generate trees
-            if (y === surface && biome !== 'DESERT' && biome !== 'SNOW' && Math.random() > 0.98) {
-                treePositions.push({x: wx, y: surface, z: wz});
+                
+                // Generate trees (check at surface level only, once per x,z position)
+                if (y === surface && biome !== 'DESERT' && biome !== 'SNOW' && Math.random() > 0.98) {
+                    treePositions.push({x: wx, y: surface, z: wz});
+                }
             }
         }
     }

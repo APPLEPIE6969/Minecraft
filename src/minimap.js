@@ -1,4 +1,4 @@
-import { getSurfaceHeight, isSolid } from './world.js';
+import { getSurfaceHeight, isSolid, RENDER_DISTANCE, CHUNK_SIZE } from './world.js';
 
 export class Minimap {
     constructor(player) {
@@ -103,6 +103,11 @@ export class Minimap {
     drawTerrain(ctx, width, height, playerX, playerZ) {
         const range = Math.floor(Math.min(width, height) / 2 / this.zoom);
         
+        // Limit drawing to loaded chunks
+        const playerChunkX = Math.floor(playerX / CHUNK_SIZE);
+        const playerChunkZ = Math.floor(playerZ / CHUNK_SIZE);
+        const loadedRange = RENDER_DISTANCE * CHUNK_SIZE;
+        
         // Check if player moved significantly
         const playerKey = `${Math.floor(playerX / 10)},${Math.floor(playerZ / 10)}`;
         const needsUpdate = Math.abs(this.lastUpdatePos.x - playerX) > 1 || 
@@ -112,6 +117,15 @@ export class Minimap {
             for (let x = -range; x <= range; x++) {
                 const wx = playerX + x;
                 const wz = playerZ + y;
+                
+                // Skip drawing outside loaded chunks
+                const chunkX = Math.floor(wx / CHUNK_SIZE);
+                const chunkZ = Math.floor(wz / CHUNK_SIZE);
+                if (Math.abs(chunkX - playerChunkX) > RENDER_DISTANCE || 
+                    Math.abs(chunkZ - playerChunkZ) > RENDER_DISTANCE) {
+                    continue;
+                }
+                
                 const cacheKey = `${Math.floor(wx)},${Math.floor(wz)}`;
                 
                 let colors;

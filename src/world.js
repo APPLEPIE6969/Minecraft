@@ -307,7 +307,7 @@ export function updateWorld(scene, playerPos) {
     const px = Math.floor(playerPos.x / CHUNK_SIZE);
     const pz = Math.floor(playerPos.z / CHUNK_SIZE);
     
-    // Load chunks
+    // Load chunks within render distance
     for (let x = -RENDER_DISTANCE; x <= RENDER_DISTANCE; x++) {
         for (let z = -RENDER_DISTANCE; z <= RENDER_DISTANCE; z++) {
             const key = `${px + x},${pz + z}`;
@@ -317,7 +317,7 @@ export function updateWorld(scene, playerPos) {
         }
     }
     
-    // Unload distant chunks
+    // Unload chunks outside extended render distance
     for (const [key, group] of chunks.entries()) {
         const [cx, cz] = key.split(',').map(Number);
         if (Math.abs(cx - px) > RENDER_DISTANCE + 2 || Math.abs(cz - pz) > RENDER_DISTANCE + 2) {

@@ -9,29 +9,93 @@ console.log('Game module loaded successfully');
 
 // Scene setup
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ antialias: false });
-renderer.setSize(window.innerWidth, window.innerHeight);
+
+// Get optimal resolution for user's screen (up to 4K)
+function getOptimalResolution() {
+    const maxWidth = 3840; // 4K width
+    const maxHeight = 2160; // 4K height
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2); // Limit pixel ratio for performance
+    
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    
+    // Scale down if exceeding 4K
+    if (width > maxWidth) {
+        const scale = maxWidth / width;
+        width = maxWidth;
+        height = height * scale;
+    }
+    if (height > maxHeight) {
+        const scale = maxHeight / height;
+        height = maxHeight;
+        width = width * scale;
+    }
+    
+    return { width, height, pixelRatio };
+}
+
+const resolution = getOptimalResolution();
+const camera = new THREE.PerspectiveCamera(75, resolution.width / resolution.height, 0.1, 1000);
+
+// High-quality renderer setup
+const renderer = new THREE.WebGLRenderer({ 
+    antialias: true,
+    alpha: false,
+    powerPreference: "high-performance"
+});
+
+renderer.setSize(resolution.width, resolution.height);
+renderer.setPixelRatio(resolution.pixelRatio);
+
+// Enable advanced rendering features
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = true;
+renderer.shadowMap.needsUpdate = true;
+
+// Tone mapping for better lighting
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+
+// Color space and output encoding
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.useLegacyLights = false;
+
+// Enable physically correct lighting
+renderer.physicallyCorrectLights = true;
+
+// High-quality rendering settings
+renderer.info.autoReset = false;
+
 document.body.appendChild(renderer.domElement);
 
 // Lighting with day/night cycle
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
 scene.add(ambientLight);
 
-const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
 sun.position.set(100, 200, 50);
 sun.castShadow = true;
-sun.shadow.mapSize.width = 2048;
-sun.shadow.mapSize.height = 2048;
+
+// High-quality shadow settings
+sun.shadow.mapSize.width = 4096;
+sun.shadow.mapSize.height = 4096;
 sun.shadow.camera.near = 0.5;
 sun.shadow.camera.far = 500;
 sun.shadow.camera.left = -100;
 sun.shadow.camera.right = 100;
 sun.shadow.camera.top = 100;
 sun.shadow.camera.bottom = -100;
+sun.shadow.bias = -0.0001;
+sun.shadow.normalBias = 0.02;
+
+// Add moon light for nighttime
+const moon = new THREE.DirectionalLight(0x4444ff, 0.1);
+moon.position.set(-100, 200, -50);
+moon.castShadow = false; // Moon doesn't cast shadows for performance
+
 scene.add(sun);
+scene.add(moon);
 
 // Day/night cycle
 let timeOfDay = 0.5; // 0 = midnight, 0.5 = noon, 1 = midnight
@@ -49,19 +113,32 @@ function updateDayNight(delta) {
         100 * Math.sin(angle)
     );
     
+    // Update moon position (opposite to sun)
+    moon.position.set(
+        -100 * Math.cos(angle),
+        Math.max(0, 200 * Math.max(0, -sunHeight)),
+        -100 * Math.sin(angle)
+    );
+    
     // Update lighting
     if (sunHeight > 0) {
         // Daytime
-        ambientLight.intensity = 0.5 + sunHeight * 0.3;
-        sun.intensity = 0.8 * sunHeight;
+        const dayIntensity = sunHeight;
+        ambientLight.intensity = 0.3 + dayIntensity * 0.4;
+        sun.intensity = 1.2 * dayIntensity;
+        sun.castShadow = true;
+        moon.intensity = 0;
         scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
         scene.background = new THREE.Color(0x87CEEB);
     } else {
         // Nighttime
-        ambientLight.intensity = 0.1;
+        const nightIntensity = Math.abs(sunHeight);
+        ambientLight.intensity = 0.05 + nightIntensity * 0.1;
         sun.intensity = 0;
-        scene.fog = new THREE.Fog(0x000011, 20, 100);
-        scene.background = new THREE.Color(0x000011);
+        sun.castShadow = false;
+        moon.intensity = 0.2 * nightIntensity;
+        scene.fog = new THREE.Fog(0x000022, 20, 100);
+        scene.background = new THREE.Color(0x000022);
     }
 }
 
@@ -612,11 +689,13 @@ function animate() {
     }
 }
 
-// Window resize
+// Window resize with dynamic resolution support
 window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const newResolution = getOptimalResolution();
+    camera.aspect = newResolution.width / newResolution.height;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(newResolution.width, newResolution.height);
+    renderer.setPixelRatio(newResolution.pixelRatio);
 });
 
 // Close crafting menu button

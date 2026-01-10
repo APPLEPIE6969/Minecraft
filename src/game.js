@@ -11,21 +11,22 @@ console.log('Game module loaded successfully');
 // Scene setup
 const scene = new THREE.Scene();
 
-// Get optimal resolution for user's screen (up to 4K)
+// Get optimal resolution for low-memory systems (capped at 1080p)
 function getOptimalResolution() {
-    const maxWidth = 3840; // 4K width
-    const maxHeight = 2160; // 4K height
-    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2); // Limit pixel ratio for performance
+    const maxWidth = 1920; // 1080p width
+    const maxHeight = 1080; // 1080p height
+    const pixelRatio = 1; // Force 1x for memory efficiency
     
     let width = window.innerWidth;
     let height = window.innerHeight;
     
-    // Scale down if exceeding 4K
+    // Scale down if exceeding 1080p
     if (width > maxWidth) {
         const scale = maxWidth / width;
         width = maxWidth;
         height = height * scale;
     }
+    
     if (height > maxHeight) {
         const scale = maxHeight / height;
         height = maxHeight;
@@ -38,9 +39,9 @@ function getOptimalResolution() {
 const resolution = getOptimalResolution();
 const camera = new THREE.PerspectiveCamera(75, resolution.width / resolution.height, 0.1, 1000);
 
-// High-quality renderer setup
+// Low-memory renderer setup
 const renderer = new THREE.WebGLRenderer({ 
-    antialias: true,
+    antialias: false, // Disable for performance
     alpha: false,
     powerPreference: "high-performance"
 });
@@ -48,96 +49,42 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setSize(resolution.width, resolution.height);
 renderer.setPixelRatio(resolution.pixelRatio);
 
-// Enable advanced rendering features
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.shadowMap.autoUpdate = true;
-renderer.shadowMap.needsUpdate = true;
-
-// Tone mapping for better lighting
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
-
-// Color space and output encoding
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.useLegacyLights = false;
-
-// Enable physically correct lighting
-renderer.physicallyCorrectLights = true;
-
-// High-quality rendering settings
-renderer.info.autoReset = false;
+// Disable advanced rendering features for memory efficiency
+renderer.shadowMap.enabled = false;
+renderer.toneMapping = THREE.NoToneMapping;
+renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+renderer.useLegacyLights = true;
 
 document.body.appendChild(renderer.domElement);
 
-// Lighting with day/night cycle
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+// Simple lighting for performance
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
 scene.add(ambientLight);
 
-const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+const sun = new THREE.DirectionalLight(0xffffff, 0.8);
 sun.position.set(100, 200, 50);
-sun.castShadow = true;
-
-// High-quality shadow settings
-sun.shadow.mapSize.width = 4096;
-sun.shadow.mapSize.height = 4096;
-sun.shadow.camera.near = 0.5;
-sun.shadow.camera.far = 500;
-sun.shadow.camera.left = -100;
-sun.shadow.camera.right = 100;
-sun.shadow.camera.top = 100;
-sun.shadow.camera.bottom = -100;
-sun.shadow.bias = -0.0001;
-sun.shadow.normalBias = 0.02;
-
-// Add moon light for nighttime
-const moon = new THREE.DirectionalLight(0x4444ff, 0.1);
-moon.position.set(-100, 200, -50);
-moon.castShadow = false; // Moon doesn't cast shadows for performance
-
+sun.castShadow = false; // Disabled for performance
 scene.add(sun);
-scene.add(moon);
 
-// Day/night cycle
+// Simple day/night cycle (no complex lighting)
 let timeOfDay = 0.5; // 0 = midnight, 0.5 = noon, 1 = midnight
 function updateDayNight(delta) {
     timeOfDay += delta / 120; // 2 minute day cycle
     if (timeOfDay > 1) timeOfDay -= 1;
     
-    const angle = timeOfDay * Math.PI * 2 - Math.PI / 2;
-    const sunHeight = Math.sin(angle);
+    const sunHeight = Math.sin(timeOfDay * Math.PI * 2 - Math.PI / 2);
     
-    // Update sun position
-    sun.position.set(
-        100 * Math.cos(angle),
-        Math.max(0, 200 * sunHeight),
-        100 * Math.sin(angle)
-    );
-    
-    // Update moon position (opposite to sun)
-    moon.position.set(
-        -100 * Math.cos(angle),
-        Math.max(0, 200 * Math.max(0, -sunHeight)),
-        -100 * Math.sin(angle)
-    );
-    
-    // Update lighting
+    // Simple lighting adjustment
     if (sunHeight > 0) {
         // Daytime
-        const dayIntensity = sunHeight;
-        ambientLight.intensity = 0.3 + dayIntensity * 0.4;
-        sun.intensity = 1.2 * dayIntensity;
-        sun.castShadow = true;
-        moon.intensity = 0;
+        ambientLight.intensity = 0.6;
+        sun.intensity = 0.8;
         scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
         scene.background = new THREE.Color(0x87CEEB);
     } else {
         // Nighttime
-        const nightIntensity = Math.abs(sunHeight);
-        ambientLight.intensity = 0.05 + nightIntensity * 0.1;
-        sun.intensity = 0;
-        sun.castShadow = false;
-        moon.intensity = 0.2 * nightIntensity;
+        ambientLight.intensity = 0.2;
+        sun.intensity = 0.1;
         scene.fog = new THREE.Fog(0x000022, 20, 100);
         scene.background = new THREE.Color(0x000022);
     }

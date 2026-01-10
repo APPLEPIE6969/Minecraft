@@ -288,7 +288,7 @@ function getBlockAtRay() {
     return null;
 }
 
-// Collision detection (AABB)
+// Collision detection (AABB) - optimized with early exit
 function checkCollision(x, y, z) {
     const minX = Math.floor(x - player.width / 2);
     const maxX = Math.floor(x + player.width / 2);
@@ -296,6 +296,9 @@ function checkCollision(x, y, z) {
     const maxY = Math.floor(y + player.height);
     const minZ = Math.floor(z - player.width / 2);
     const maxZ = Math.floor(z + player.width / 2);
+    
+    // Quick vertical check first
+    if (minY < -50 || maxY > 200) return false;
     
     for (let bx = minX; bx <= maxX; bx++) {
         for (let by = minY; by <= maxY; by++) {
@@ -656,6 +659,7 @@ if (!coordsEl) {
 }
 let lastUpdate = 0;
 let worldUpdateTimer = 0;
+let minimapUpdateTimer = 0;
 
 // Animation loop
 const clock = new THREE.Clock();
@@ -796,13 +800,17 @@ function animate() {
         
         // Optimize world updates - only update every few frames
         worldUpdateTimer += delta;
-        if (worldUpdateTimer >= 0.2) {
+        if (worldUpdateTimer >= 0.5) {
             updateWorld(scene, player.pos);
             worldUpdateTimer = 0;
         }
         
-        // Update minimap and mobs
-        if (minimap) minimap.update();
+        // Update minimap and mobs (throttled)
+        minimapUpdateTimer += delta;
+        if (minimapUpdateTimer >= 0.2) {
+            if (minimap) minimap.update();
+            minimapUpdateTimer = 0;
+        }
         if (mobController) mobController.update(delta, player.pos);
         
         // Update UI every 0.1s

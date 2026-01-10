@@ -5,7 +5,7 @@ import { MATS } from './textures.js';
 const noise2D = createNoise2D();
 
 export const CHUNK_SIZE = 16;
-export const RENDER_DISTANCE = 8;
+export const RENDER_DISTANCE = 6;
 export const chunks = new Map();
 export const worldData = new Map(); // Stores block data: "x,y,z" -> blockType
 const geometry = new THREE.BoxGeometry(1, 1, 1);

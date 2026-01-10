@@ -338,31 +338,21 @@ export function updateWorld(scene, playerPos) {
         }
     }
     
-    // Load only 1 new chunk per frame to spread work
-    const chunksToUnload = [];
-    for (const [key, group] of chunks.entries()) {
-        if (!chunksToLoad.has(key)) {
-            chunksToUnload.push({key, group});
-        }
-    }
-    
-    // Load chunks (limit to 1 per frame)
-    let loadedOne = false;
+    // Load new chunks (all at once, but less frequent)
     for (const key of chunksToLoad) {
-        if (!chunks.has(key) && !loadedOne) {
+        if (!chunks.has(key)) {
             const [cx, cz] = key.split(',').map(Number);
             createChunk(scene, cx, cz);
-            loadedOne = true;
-            break;
         }
     }
     
-    // Unload chunks (limit to 1 per frame)
-    if (chunksToUnload.length > 0 && !loadedOne) {
-        const {key, group} = chunksToUnload[0];
-        scene.remove(group);
-        disposeChunkGroup(group);
-        chunks.delete(key);
+    // Unload chunks that are no longer needed (all at once, but less frequent)
+    for (const [key, group] of chunks.entries()) {
+        if (!chunksToLoad.has(key)) {
+            scene.remove(group);
+            disposeChunkGroup(group);
+            chunks.delete(key);
+        }
     }
 }
 

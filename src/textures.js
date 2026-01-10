@@ -2,8 +2,8 @@ import * as THREE from 'three';
 
 function createTexture(color, pattern = null, details = []) {
     const canvas = document.createElement('canvas');
-    canvas.width = 256; // Reduced from 512 for better compatibility
-    canvas.height = 256;
+    canvas.width = 512; // 4K textures
+    canvas.height = 512;
     const ctx = canvas.getContext('2d');
     
     // Base color

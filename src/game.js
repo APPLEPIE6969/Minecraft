@@ -11,16 +11,16 @@ console.log('Game module loaded successfully');
 // Scene setup
 const scene = new THREE.Scene();
 
-// Get optimal resolution for low-memory systems (capped at 1080p)
+// Get optimal resolution for balanced performance (capped at 2K)
 function getOptimalResolution() {
-    const maxWidth = 1920; // 1080p width
-    const maxHeight = 1080; // 1080p height
-    const pixelRatio = 1; // Force 1x for memory efficiency
+    const maxWidth = 2560; // 2K width
+    const maxHeight = 1440; // 2K height
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5); // Limit pixel ratio for performance
     
     let width = window.innerWidth;
     let height = window.innerHeight;
     
-    // Scale down if exceeding 1080p
+    // Scale down if exceeding 2K
     if (width > maxWidth) {
         const scale = maxWidth / width;
         width = maxWidth;
@@ -39,9 +39,9 @@ function getOptimalResolution() {
 const resolution = getOptimalResolution();
 const camera = new THREE.PerspectiveCamera(75, resolution.width / resolution.height, 0.1, 1000);
 
-// Low-memory renderer setup
+// Balanced renderer setup
 const renderer = new THREE.WebGLRenderer({ 
-    antialias: false, // Disable for performance
+    antialias: true, // Enable for 2K quality
     alpha: false,
     powerPreference: "high-performance"
 });
